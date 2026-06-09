@@ -1,0 +1,53 @@
+# Session editor UI
+
+A tiny browser UI for viewing and editing the agent's `session.jsonl` as a single
+conversation thread — click any message to edit it in place, and append new ones
+from a chat-style composer. It edits the same file `agent.sh` replays verbatim to
+the model, so the editor *is* how you shape an agent's identity and queue its work
+(see the "single source of truth" notes in the repo `CLAUDE.md`).
+
+Zero dependencies beyond Node's standard library — no build step, no `npm install`.
+
+## Run
+
+```bash
+./ui.sh                                 # edits ./session.jsonl (repo root); opens a browser
+./ui.sh --port 9000
+./ui.sh --session /path/to/other/session.jsonl   # point at any agent's session
+./ui.sh --no-open                       # don't auto-open a browser
+```
+
+`./ui.sh` (at the repo root) is a thin launcher; `node ui/server.js` with the same
+flags works identically. `SESSION_FILE=...` is honored too (matching `agent.sh`).
+
+## What it does
+
+- **Conversation view.** One scrolling column, like a chat transcript. System /
+  user / assistant messages are top-level; each `tool` result is nested under the
+  assistant `tool_calls` that produced it (matched by `tool_call_id`). Color-coded
+  by role; long messages are clamped with a "Show more" toggle.
+- **Click to edit, in place.** Clicking a message expands it into an inline editor
+  for its role, `content`, `created_at`, the `ephemeral` flag (system),
+  `tool_call_id` (tool results), or — for assistant messages — each tool call's
+  name / id / `arguments`. A **Raw JSON** toggle edits the whole record and
+  preserves any custom fields the form doesn't surface. Escape or **Done** closes.
+- **Composer.** Type at the bottom and hit **Enter** — the message is appended
+  *and saved* in one go, so a waiting `agent.sh` picks it up and the session just
+  continues. Shift+Enter inserts a newline; a role picker covers system/assistant
+  appends.
+- **Live refresh.** While you have no unsaved edits, the UI polls the file and
+  shows messages a running agent appends — you watch the session continue.
+- **Insert / remove / reorder.** The inline editor has Up / Down / Delete and
+  "+ Insert below"; ⌘/Ctrl-S saves pending edits.
+- **Save = whole file.** Saving rewrites `session.jsonl` as one compact JSON object
+  per line. Every save first copies the current file to
+  `session.jsonl.bak.<UTC stamp>` (same convention as `compact_session`), and the
+  write is atomic (temp file + rename).
+
+## Safety
+
+- If a live agent run holds `session.jsonl.lock`, saving is refused (HTTP 409); the
+  UI offers to force, since editing mid-turn would interleave with the run.
+- Lines that don't parse as JSON are reported in a banner and would be dropped on
+  save — fix or remove them first.
+- Binds to `127.0.0.1` only.
