@@ -13,9 +13,10 @@
      headings. No web-font CDN: the tool stays self-contained and offline,
      matching agent.sh's zero-dependency ethos.
 
-     Layout: a single conversation column (like a chat transcript). Click
-     any message to edit it in place; a composer at the bottom appends a
-     new message and saves in one keystroke.
+     Layout: a full-width chat transcript — user messages align right,
+     assistant/tool/system align left, each card sized to its content. Click
+     any message to edit it in place (the editor stretches to full width); a
+     composer at the bottom appends a new message and saves in one keystroke.
      =================================================================== */
   :root {
     --font-mono: "Berkeley Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
@@ -157,14 +158,17 @@
   }
   .lbl { margin-left: 5px; }
 
-  /* ---- conversation column ---- */
+  /* ---- conversation thread (full width, chat-aligned) ---- */
   main { flex: 1; overflow: auto; min-height: 0; }
-  #thread-wrap { max-width: 780px; margin: 0 auto; padding: 16px 18px 28px; }
+  #thread-wrap { padding: 16px 28px 28px; }
+  #thread { display: flex; flex-direction: column; }
   .empty { color: var(--ink-faint); padding: 60px 16px; text-align: center; font-family: var(--font-serif); font-size: 15px; }
 
   /* ---- message cards ---- */
   .msg {
     position: relative; margin: 10px 0; padding: 11px 14px 12px;
+    align-self: flex-start; width: fit-content;
+    min-width: min(340px, 100%); max-width: 62%;
     background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--radius); cursor: pointer;
     box-shadow: 0 1px 0 rgba(33,28,21,.03);
@@ -180,6 +184,9 @@
   .msg.role-user      { --mark: var(--c-user); }
   .msg.role-assistant { --mark: var(--c-assistant); }
   .msg.role-tool      { --mark: var(--c-tool); }
+  .msg.role-user { align-self: flex-end; }
+  .msg.role-user::before { left: auto; right: 0; }
+  .msg.editing { align-self: stretch; width: auto; min-width: 0; max-width: none; }
   .msg.nested { margin-left: 32px; }
   .msg.ghost { background: transparent; border-style: dashed; box-shadow: none; cursor: default; opacity: .8; }
 
@@ -264,14 +271,14 @@
     flex: none; border-top: 1px solid var(--line); background: var(--surface);
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   }
-  .composer-inner { max-width: 780px; margin: 0 auto; display: flex; gap: 9px; align-items: flex-end; }
+  .composer-inner { display: flex; gap: 9px; align-items: flex-end; }
   #composer-role { width: auto; flex: none; padding: 8px 7px; font-size: 12px; }
   #composer-text {
     flex: 1; resize: none; min-height: 0; max-height: 38dvh;
     padding: 8px 11px; line-height: 1.5; overflow-y: auto;
   }
   #send-btn { flex: none; }
-  .composer-hint { max-width: 780px; margin: 6px auto 0; font-size: 10.5px; color: var(--ink-faint); }
+  .composer-hint { margin: 6px 0 0; font-size: 10.5px; color: var(--ink-faint); }
 
   /* ---- toast ---- */
   #toast {
@@ -299,6 +306,7 @@
     button { padding: 9px 13px; }
     #reload-btn .lbl { display: none; }
     #thread-wrap { padding: 12px 12px 24px; }
+    .msg { max-width: 92%; }
     .msg.nested { margin-left: 14px; }
     .meta .time { display: none; }
     .row-2 { flex-direction: column; gap: 14px; }
