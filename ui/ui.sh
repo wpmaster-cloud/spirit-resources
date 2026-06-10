@@ -2,14 +2,16 @@
 # Spin up the bash-agent session editor UI.
 #
 # Usage:
-#   ./ui.sh                                  # edit ./session.jsonl, open a browser
+#   ./ui.sh --session /path/to/agent/session.jsonl   # edit an agent's session
 #   ./ui.sh --port 9000
-#   ./ui.sh --session /path/to/other/session.jsonl   # edit any agent's session
 #   ./ui.sh --no-open                        # don't auto-open a browser
 #
-# A thin launcher for ui/server.js — a zero-dependency Node stdlib server (no
-# build step, no npm install). All arguments are passed straight through; the
-# SESSION_FILE env var and the server's flags are honored. See ui/README.md.
+# A thin launcher for server.js in this folder — a zero-dependency Node stdlib
+# server (no build step, no npm install). All arguments are passed straight
+# through; the SESSION_FILE env var and the server's flags are honored. With
+# no --session/SESSION_FILE the server picks the agent session in this
+# folder's parent: a legacy session.jsonl, else the single session-*.jsonl.
+# See README.md.
 
 set -euo pipefail
 
@@ -23,4 +25,4 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-exec node "$SCRIPT_DIR/ui/server.js" "$@"
+exec node "$SCRIPT_DIR/server.js" "$@"

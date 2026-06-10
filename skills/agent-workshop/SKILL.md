@@ -21,8 +21,9 @@ sessions.
 
 ```
 agents/researcher/
-├── agent.sh         # the runtime (copy or symlink of this folder's agent.sh)
-└── session.jsonl    # system prompt + entire conversation; single source of truth
+├── agent.sh                        # the runtime (copy or symlink of this folder's agent.sh)
+├── agent.env                       # optional KEY=VALUE config pins (real environment wins)
+└── session-researcher-<id>.jsonl  # system prompt + entire conversation; single source of truth
 ```
 
 Facts you rely on:
@@ -30,15 +31,25 @@ Facts you rely on:
 - `agent.sh` works out of its own folder, wherever it is invoked from. A
   symlinked `agent.sh` still uses the *symlink's* folder as workspace, so many
   agents can share one script file.
-- The first `session.jsonl` line is the system prompt. A missing session is
-  self-seeded with one minimal line on first run, so the fastest spawn is:
-  create folder, link script, run it. Author a full session first (below) when
-  the agent needs a real role from turn one.
-- Every config value is env-overridable per invocation: `MODEL`, `BASE_URL`,
+- The session file is discovered, in order: an explicit `SESSION_FILE`, a
+  legacy `session.jsonl` (honored forever), else the folder's single
+  `session-*.jsonl`. A missing one is self-seeded on first run as
+  `session-<AGENT_NAME>-<id>.jsonl` — `AGENT_NAME` defaults to the folder's
+  name — so the fastest spawn is: create folder, link script, run it. Several
+  `session-*.jsonl` files in one folder are refused with exit **78**; keep
+  exactly one, or `--reset`. The first session line is the system prompt;
+  author a full session first (below) when the agent needs a real role from
+  turn one.
+- Config precedence, highest first: real environment → `agent.env` beside the
+  script (strict KEY=VALUE lines) → BASE_URL/MODEL auto-detected from the API
+  key's prefix (OpenAI, Anthropic, OpenRouter, Groq, xAI, Gemini) → defaults.
+  Values: `AGENT_NAME`, `MODEL`, `BASE_URL`,
   `API_KEY`/`BASH_AGENT_API_KEY`/`OPENAI_API_KEY`, `MAX_TURNS`,
   `COMMAND_TIMEOUT_SEC`, `CONTEXT_COMPACT_TOKENS`, `SESSION_FILE`.
-- Only one run per session at a time: while a run is active a
-  `session.jsonl.lock` directory exists, and a second run exits with code
+  Pin per-agent behavior in `agent.env`; keep API keys in the environment (or
+  a secret store), never in files you ship or commit.
+- Only one run per session at a time: while a run is active a `<session>.lock`
+  directory exists next to the session file, and a second run exits with code
   **75** (busy — retry later). Appending messages is always allowed.
 
 ## Spawn a subagent
@@ -52,7 +63,8 @@ chmod +x "agents/$name/agent.sh"
 
 # Author the system prompt. Reuse this folder's prompt as the base so the
 # subagent inherits the shell discipline, and put its role on top.
-jq -r -s 'map(select(.role == "system")) | .[0].content' session.jsonl > /tmp/base.txt
+sess=(session*.jsonl)
+jq -r -s 'map(select(.role == "system")) | .[0].content' "${sess[0]}" > /tmp/base.txt
 {
   cat <<'EOF'
 You are Researcher, a focused subagent. Your only job: <one-sentence scope>.
@@ -70,8 +82,11 @@ rm -f /tmp/base.txt /tmp/prompt.txt
 ./agents/"$name"/agent.sh "Confirm you are alive: state your role in one line."
 ```
 
-Never copy an existing `session.jsonl` into a new agent unless the user
-explicitly wants it to inherit that conversation.
+Authoring to the legacy name `session.jsonl` is fine — it is honored forever.
+Skip the authoring step and the agent self-seeds as
+`session-<name>-<id>.jsonl` with a minimal prompt instead. Never copy an
+existing session file into a new agent unless the user explicitly wants it to
+inherit that conversation.
 
 ## Give work
 
@@ -91,6 +106,13 @@ message instead (next section) — queuing never blocks and never collides.
 
 ## Communicate through the session file
 
+Resolve the agent's session file once (works for legacy and named sessions —
+never glob inside a redirection):
+
+```bash
+sess=(agents/researcher/session*.jsonl)   # exactly one match on a healthy agent
+```
+
 **Queue a task/message** (safe anytime, even mid-run — append only, built with
 jq, exact record shape):
 
@@ -99,14 +121,14 @@ jq -nc \
   --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg c "New instruction: also cover Y. Reply in outbox.md." \
   '{kind:"message", created_at:$t, role:"user", content:$c}' \
-  >> agents/researcher/session.jsonl
+  >> "${sess[0]}"
 ```
 
 Queued messages are processed on the agent's **next run** (its cron wake, or
 any one-shot you fire later). To deliver now:
 
 ```bash
-while [ -d agents/researcher/session.jsonl.lock ]; do sleep 5; done
+while [ -d "${sess[0]}.lock" ]; do sleep 5; done
 ./agents/researcher/agent.sh "Process any pending messages above."
 ```
 
@@ -114,14 +136,14 @@ while [ -d agents/researcher/session.jsonl.lock ]; do sleep 5; done
 
 ```bash
 # running or idle?
-[ -d agents/researcher/session.jsonl.lock ] && echo running || echo idle
+[ -d "${sess[0]}.lock" ] && echo running || echo idle
 
 # last substantive reply
 jq -r -s '[.[] | select(.role == "assistant" and (.content // "") != "")] | last.content' \
-  agents/researcher/session.jsonl
+  "${sess[0]}"
 
 # recent activity, one line per record
-tail -n 8 agents/researcher/session.jsonl \
+tail -n 8 "${sess[0]}" \
   | jq -r '.role + ": " + ((.content // "(tool calls)")[0:160])'
 ```
 
@@ -144,23 +166,33 @@ API at the same instant; a wake that finds the agent busy exits 75 harmlessly.
 
 ## Containers and Kubernetes
 
-`ops/` in this repo has the full thin deployment (alpine + bash/curl/jq/rg/git,
-multi-arch amd64+arm64): `ops/Dockerfile`, `ops/agent.yaml`,
-`ops/build-push.sh`. Containers are **ephemeral by design**: the agent
-self-seeds its session on first run and a pod replacement is a factory reset.
-Identity is given the same way as everywhere else — by manipulating
-`/work/session.jsonl` (`kubectl cp` a session in, or just message it).
-Anything durable is the agent's own job: tell it to commit/push work products
-to a git remote (`GIT_TOKEN` is wired in the manifest). Read
-`ops/agent.yaml`'s header comment for the deploy/clone/operate commands. The
-short version:
+`ops/` in the agent repo (github.com/tomerfooks/bash-agent) has the full thin
+deployment (alpine + bash/curl/jq/rg/git, multi-arch amd64+arm64):
+`ops/Dockerfile`, `ops/agent.yaml`, `ops/build-push.sh`. The image bakes in
+**only `agent.sh`** — no skills, no UI. An agent that needs a skill fetches it
+on demand from the public resources repo:
+
+```bash
+git clone --depth 1 https://github.com/wpmaster-cloud/spirit-resources /work/resources
+cp -R /work/resources/skills /work/resources/ui /work/ && rm -rf /work/resources
+cat /work/skills/<name>/SKILL.md
+```
+
+Containers are **ephemeral by design**: the agent self-seeds its session on
+first run (named after `AGENT_NAME`, set in the manifest) and a pod
+replacement is a factory reset. Identity is given the same way as everywhere
+else — by manipulating the session file (`kubectl cp` a `session.jsonl` in —
+the legacy name is honored — or just message it). Anything durable is the
+agent's own job: tell it to commit/push work products to a git remote
+(`GIT_TOKEN` is wired in the manifest). Read `ops/agent.yaml`'s header comment
+for the deploy/clone/operate commands. The short version:
 
 ```bash
 ops/build-push.sh                                   # build+push multi-arch image
 kubectl apply -f ops/agent.yaml                     # deploy agent "agent-main"
 sed 's/agent-main/agent-researcher/g' ops/agent.yaml | kubectl apply -f -   # clone
 kubectl exec deploy/agent-main -- /work/agent.sh "task"                     # give work
-kubectl exec deploy/agent-main -- tail -n 3 /work/session.jsonl             # read state
+kubectl exec deploy/agent-main -- sh -c 'tail -n 3 /work/session*.jsonl'    # read state
 ```
 
 ## Invariants (do not break these)
@@ -172,6 +204,9 @@ kubectl exec deploy/agent-main -- tail -n 3 /work/session.jsonl             # re
   session.
 - One run per session; respect exit 75 instead of deleting a live lock. A lock
   whose owner pid is dead is taken over automatically — don't clean it by hand.
+- One session file per folder. Never create a second `session-*.jsonl` next to
+  an existing one — the agent refuses to run (exit 78) until exactly one
+  remains.
 - A new agent needs its own folder and its own freshly authored session.
 - Keep subagent prompts narrow: one role, one deliverable convention, "reply
   idle when nothing pending" — that is what makes cron wakes cheap.

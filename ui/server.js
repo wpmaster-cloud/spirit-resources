@@ -31,10 +31,30 @@ const { execFile } = require('child_process');
 const HERE = __dirname;
 const INDEX_HTML = path.join(HERE, 'index.html');
 
-// Defaults match agent.sh: the session lives at the repo root next to agent.sh,
-// which is this file's parent directory.
+// Defaults match agent.sh's discovery, applied to this folder's parent (the
+// agent folder when ui/ is dropped inside one): an explicit SESSION_FILE wins;
+// else a legacy session.jsonl; else the folder's single session-*.jsonl; else
+// fall back to the legacy path (shown as missing).
+function discoverSession(dir) {
+  const legacy = path.join(dir, 'session.jsonl');
+  if (fs.existsSync(legacy)) return legacy;
+  let matches = [];
+  try {
+    matches = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('session-') && f.endsWith('.jsonl'))
+      .sort();
+  } catch {
+    /* unreadable dir: fall through to legacy */
+  }
+  if (matches.length === 1) return path.join(dir, matches[0]);
+  if (matches.length > 1) {
+    console.error(`several session files in ${dir}; pass --session to pick one`);
+  }
+  return legacy;
+}
 const DEFAULT_SESSION =
-  process.env.SESSION_FILE || path.join(path.dirname(HERE), 'session.jsonl');
+  process.env.SESSION_FILE || discoverSession(path.dirname(HERE));
 
 // ISO-8601 UTC stamp, matching agent.sh's utc_now() (whole seconds, trailing Z).
 function utcNow() {
@@ -267,17 +287,29 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const sessionFile = path.resolve(opts.session);
   const server = makeServer(sessionFile);
-  server.listen(opts.port, opts.host, () => {
-    const url = `http://${opts.host}:${opts.port}/`;
+  // If the requested port is taken (e.g. several agent UIs side by side),
+  // walk up one port at a time until a free one is found.
+  let port = opts.port;
+  let triesLeft = 100;
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && triesLeft > 0) {
+      triesLeft -= 1;
+      console.log(`port ${port} is busy; trying ${port + 1}`);
+      port += 1;
+      server.listen(port, opts.host);
+      return;
+    }
+    console.error(`server error: ${err.message}`);
+    process.exit(1);
+  });
+  server.on('listening', () => {
+    const url = `http://${opts.host}:${port}/`;
     console.log(`session editor: ${url}`);
     console.log(`editing: ${sessionFile}`);
     console.log('press Ctrl-C to stop');
     if (opts.open) openBrowser(url);
   });
-  server.on('error', (err) => {
-    console.error(`server error: ${err.message}`);
-    process.exit(1);
-  });
+  server.listen(port, opts.host);
 }
 
 main();

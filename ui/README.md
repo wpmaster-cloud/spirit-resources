@@ -1,24 +1,28 @@
 # Session editor UI
 
-A tiny browser UI for viewing and editing the agent's `session.jsonl` as a single
+A tiny browser UI for viewing and editing the agent's session file as a single
 conversation thread — click any message to edit it in place, and append new ones
 from a chat-style composer. It edits the same file `agent.sh` replays verbatim to
-the model, so the editor *is* how you shape an agent's identity and queue its work
-(see the "single source of truth" notes in the repo `CLAUDE.md`).
+the model, so the editor *is* how you shape an agent's identity and queue its work.
 
 Zero dependencies beyond Node's standard library — no build step, no `npm install`.
 
 ## Run
 
 ```bash
-./ui.sh                                 # edits ./session.jsonl (repo root); opens a browser
+./ui.sh --session /path/to/agent/session.jsonl   # point at an agent's session
 ./ui.sh --port 9000
-./ui.sh --session /path/to/other/session.jsonl   # point at any agent's session
 ./ui.sh --no-open                       # don't auto-open a browser
 ```
 
-`./ui.sh` (at the repo root) is a thin launcher; `node ui/server.js` with the same
-flags works identically. `SESSION_FILE=...` is honored too (matching `agent.sh`).
+`ui.sh` is a thin launcher; `node server.js` with the same flags works
+identically. `SESSION_FILE=...` is honored too (matching `agent.sh`). Without
+`--session`/`SESSION_FILE` the server discovers the agent session in this
+folder's parent the same way `agent.sh` does: a legacy `session.jsonl`, else
+the folder's single `session-*.jsonl`. If the requested port is busy, the
+server walks up one port at a time until it finds a free one — so several
+agent UIs can all be launched with the same `--port` and they spread out
+automatically.
 
 ## What it does
 
@@ -39,14 +43,14 @@ flags works identically. `SESSION_FILE=...` is honored too (matching `agent.sh`)
   shows messages a running agent appends — you watch the session continue.
 - **Insert / remove / reorder.** The inline editor has Up / Down / Delete and
   "+ Insert below"; ⌘/Ctrl-S saves pending edits.
-- **Save = whole file.** Saving rewrites `session.jsonl` as one compact JSON object
+- **Save = whole file.** Saving rewrites the session as one compact JSON object
   per line. Every save first copies the current file to
-  `session.jsonl.bak.<UTC stamp>` (same convention as `compact_session`), and the
+  `<session>.bak.<UTC stamp>` (same convention as `compact_session`), and the
   write is atomic (temp file + rename).
 
 ## Safety
 
-- If a live agent run holds `session.jsonl.lock`, saving is refused (HTTP 409); the
+- If a live agent run holds the session lock, saving is refused (HTTP 409); the
   UI offers to force, since editing mid-turn would interleave with the run.
 - Lines that don't parse as JSON are reported in a banner and would be dropped on
   save — fix or remove them first.
