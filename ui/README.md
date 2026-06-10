@@ -1,9 +1,10 @@
 # Session editor UI
 
 A tiny browser UI for viewing and editing the agent's session file as a single
-conversation thread — click any message to edit it in place, and append new ones
-from a chat-style composer. It edits the same file `agent.sh` replays verbatim to
-the model, so the editor *is* how you shape an agent's identity and queue its work.
+conversation thread — click a message to expand it, ✎ to edit it in place, and
+append new ones from a chat-style composer. It edits the same file `agent.sh`
+replays verbatim to the model, so the editor *is* how you shape an agent's
+identity and queue its work.
 
 Zero dependencies beyond Node's standard library — no build step, no `npm install`.
 
@@ -29,12 +30,20 @@ automatically.
 - **Conversation view.** One scrolling column, like a chat transcript. System /
   user / assistant messages are top-level; each `tool` result is nested under the
   assistant `tool_calls` that produced it (matched by `tool_call_id`). Color-coded
-  by role; long messages are clamped with a "Show more" toggle.
-- **Click to edit, in place.** Clicking a message expands it into an inline editor
-  for its role, `content`, `created_at`, the `ephemeral` flag (system),
-  `tool_call_id` (tool results), or — for assistant messages — each tool call's
-  name / id / `arguments`. A **Raw JSON** toggle edits the whole record and
-  preserves any custom fields the form doesn't surface. Escape or **Done** closes.
+  by role.
+- **Collapsed by default.** Every card is a one-line summary (for tool calls,
+  the command itself rather than its JSON wrapper). Click a card to expand it,
+  click again to collapse; the header's **Expand / Collapse** button toggles the
+  whole thread, and very long expanded payloads still clamp behind "Show more".
+- **Formatted JSON.** Expanded tool-call arguments and JSON tool results render
+  one block per key — string values shown raw, with real newlines instead of
+  `\n` escapes — and nested values pretty-printed with light syntax color.
+- **Edit in place.** The ✎ button on a card opens an inline editor for its role,
+  `content`, `created_at`, the `ephemeral` flag (system), `tool_call_id` (tool
+  results), or — for assistant messages — each tool call's name / id /
+  `arguments` (with a **Format** button to pretty-print them). A **Raw JSON**
+  toggle edits the whole record and preserves any custom fields the form doesn't
+  surface. Escape or **Done** closes.
 - **Composer.** Type at the bottom and hit **Enter** — the message is appended
   *and saved* in one go, so a waiting `agent.sh` picks it up and the session just
   continues. Shift+Enter inserts a newline; a role picker covers system/assistant

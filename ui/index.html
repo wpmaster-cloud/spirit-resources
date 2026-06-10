@@ -14,9 +14,12 @@
      matching agent.sh's zero-dependency ethos.
 
      Layout: a full-width chat transcript — user messages align right,
-     assistant/tool/system align left, each card sized to its content. Click
-     any message to edit it in place (the editor stretches to full width); a
-     composer at the bottom appends a new message and saves in one keystroke.
+     assistant/tool/system align left, each card sized to its content. Cards
+     collapse to a one-line summary by default; click to expand, ✎ to edit in
+     place (the editor stretches to full width). JSON payloads (tool-call
+     arguments, tool results) render as formatted blocks with real newlines
+     and light syntax color. A composer at the bottom appends a new message
+     and saves in one keystroke.
      =================================================================== */
   :root {
     --font-mono: "Berkeley Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
@@ -178,7 +181,6 @@
     border-radius: 3px; background: var(--mark, var(--line-strong));
   }
   .msg:hover { border-color: var(--line-strong); }
-  .msg:hover .edit-hint { opacity: 1; }
   .msg.editing { cursor: default; border-color: var(--accent); box-shadow: var(--shadow); }
   .msg.role-system    { --mark: var(--c-system); }
   .msg.role-user      { --mark: var(--c-user); }
@@ -203,20 +205,50 @@
   .chip.tool-name { color: var(--c-tool); border-color: color-mix(in srgb, var(--c-tool) 35%, var(--line)); }
   .chip.flag      { color: var(--c-system); border-color: color-mix(in srgb, var(--c-system) 35%, var(--line)); }
   .meta .time { margin-left: auto; font-size: 10px; color: var(--ink-faint); }
-  .edit-hint { font-size: 10px; color: var(--ink-faint); opacity: 0; transition: opacity .15s; }
+  .edit-btn { opacity: 0; padding: 2px 9px; font-size: 10.5px; transition: opacity .15s; }
+  .msg:hover .edit-btn, .edit-btn:focus-visible { opacity: 1; }
+  @media (hover: none) { .edit-btn { opacity: 1; } }
+
+  /* collapsed card: one-line ellipsized summary */
+  .caret { flex: none; font-size: 10px; color: var(--ink-faint); transition: transform .15s ease; }
+  .msg.open > .meta .caret { transform: rotate(90deg); }
+  .summary {
+    margin-top: 5px; font-size: 12.5px; color: var(--ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   .pv-wrap { position: relative; }
   .msg .preview {
     margin-top: 6px; font-size: 12.5px; color: var(--ink);
     white-space: pre-wrap; word-break: break-word;
   }
-  .preview.muted { color: var(--ink-faint); }
-  .pv-wrap.clamped .preview { max-height: 300px; overflow: hidden; }
+  .preview.muted, .summary.muted { color: var(--ink-faint); }
+  .pv-wrap.clamped { max-height: 300px; overflow: hidden; }
   .pv-wrap.clamped::after {
     content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 48px;
     background: linear-gradient(transparent, var(--surface)); pointer-events: none;
   }
   .show-more { margin-top: 7px; }
+
+  /* formatted JSON payloads: one block per key, raw strings, syntax color */
+  .kv { margin-top: 9px; min-width: 0; }
+  .kv-key {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--ink-soft); margin-bottom: 4px;
+  }
+  pre.code-block {
+    margin: 6px 0 0; padding: 9px 11px; font-size: 12px; line-height: 1.55;
+    background: var(--bg-tint); border: 1px solid var(--line); border-radius: 7px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .kv pre.code-block { margin-top: 0; }
+  .j-key { color: var(--c-assistant); }
+  .j-str { color: var(--c-user); }
+  .j-num { color: var(--c-system); }
+  .j-kw  { color: var(--accent); font-weight: 600; }
+  .tc-block { margin-top: 9px; }
+  .tc-block-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; min-width: 0; }
+  .tc-block-head .idx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .tc-line { display: flex; gap: 8px; align-items: baseline; margin-top: 7px; min-width: 0; }
   .tc-line code {
@@ -234,6 +266,11 @@
   .field > label {
     display: block; font-size: 10.5px; color: var(--ink-soft); font-weight: 600;
     text-transform: uppercase; letter-spacing: .6px; margin-bottom: 7px;
+  }
+  .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+  .label-row label {
+    font-size: 10.5px; color: var(--ink-soft); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .6px;
   }
   input[type=text], select, textarea {
     width: 100%; font-family: var(--font-mono); font-size: 13px; color: var(--ink);
@@ -304,7 +341,7 @@
     .path { display: none; }
     .icon-btn { width: 38px; height: 36px; }
     button { padding: 9px 13px; }
-    #reload-btn .lbl { display: none; }
+    #reload-btn .lbl, #expand-btn .lbl { display: none; }
     #thread-wrap { padding: 12px 12px 24px; }
     .msg { max-width: 92%; }
     .msg.nested { margin-left: 14px; }
@@ -331,6 +368,7 @@
       <span class="badge" id="lock-badge">…</span>
       <span class="badge dirty" id="dirty-badge" hidden>unsaved</span>
       <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme">☾</button>
+      <button class="ghost" id="expand-btn" title="Expand or collapse all messages"><span id="expand-ico">⊞</span><span class="lbl" id="expand-lbl">Expand</span></button>
       <button class="ghost" id="reload-btn" title="Reload from disk">⟳<span class="lbl">Reload</span></button>
       <button class="primary" id="save-btn" disabled>Save</button>
     </div>
@@ -353,7 +391,7 @@
       <textarea id="composer-text" rows="1" placeholder="Append a message — Enter to send &amp; save"></textarea>
       <button class="primary" id="send-btn">Send</button>
     </div>
-    <div class="composer-hint">Enter appends &amp; saves · Shift+Enter for a newline · click any message to edit it in place</div>
+    <div class="composer-hint">Enter appends &amp; saves · Shift+Enter for a newline · click a message to expand · ✎ edits in place</div>
   </footer>
 
   <div id="toast"></div>
@@ -369,6 +407,7 @@
 // ---------------------------------------------------------------------------
 const state = {
   messages: [],
+  expanded: new Set(), // uids of cards opened from their one-line summary
   editingUid: null,    // message currently expanded as an inline editor
   justOpened: false,   // focus the editor's content field after next render
   dirty: false,
@@ -435,7 +474,21 @@ function applyServerData(data) {
   state.lockOwner = data.lock_owner;
   state.errors = data.errors || [];
   state.lastSig = signatureOf(data.messages);
-  state.messages = (data.messages || []).map((m) => { m._uid = newUid(); return m; });
+  // Reuse uids for records unchanged at the same index, so card expansion
+  // survives the live-refresh poll of an append-only session.
+  const before = state.messages;
+  state.messages = (data.messages || []).map((m, i) => {
+    m._uid = before[i] && sameRecord(before[i], m) ? before[i]._uid : newUid();
+    return m;
+  });
+  const alive = new Set(state.messages.map((m) => m._uid));
+  for (const uid of [...state.expanded]) if (!alive.has(uid)) state.expanded.delete(uid);
+}
+
+function sameRecord(a, b) {
+  const ca = Object.assign({}, a); delete ca._uid; delete ca._index;
+  const cb = Object.assign({}, b); delete cb._uid; delete cb._index;
+  return JSON.stringify(ca) === JSON.stringify(cb);
 }
 
 async function load() {
@@ -601,6 +654,7 @@ function renderThread() {
     e.className = "empty";
     e.textContent = "No messages yet — write one below to start the session.";
     host.appendChild(e);
+    updateExpandBtn();
     return;
   }
 
@@ -623,10 +677,9 @@ function renderThread() {
 
   scroller.scrollTop = st;
 
-  // Clamp long messages with a fade + "show more" (measured post-layout).
+  // Clamp long payloads with a fade + "show more" (measured post-layout).
   for (const w of host.querySelectorAll(".pv-wrap")) {
-    const pv = w.querySelector(".preview");
-    if (pv.scrollHeight <= 330) continue;
+    if (w.scrollHeight <= 330) continue;
     w.classList.add("clamped");
     const b = btn("Show more", "ghost small show-more", () => {
       const c = w.classList.toggle("clamped");
@@ -634,6 +687,8 @@ function renderThread() {
     });
     w.after(b);
   }
+
+  updateExpandBtn();
 
   if (state.justOpened) {
     state.justOpened = false;
@@ -650,6 +705,63 @@ function previewText(m) {
   return m.content && m.content.trim() ? m.content : "";
 }
 
+function oneLine(s) {
+  return (s || "").replace(/\s+/g, " ").trim().slice(0, 400);
+}
+
+// For one-line tool-call summaries: show the command itself, not its JSON wrapper.
+function argsSummary(fn) {
+  const raw = fn.arguments || "";
+  try {
+    const a = JSON.parse(raw);
+    if (a && typeof a === "object" && typeof a.command === "string") return a.command;
+  } catch (e) {}
+  return raw;
+}
+
+// Formatted payload view: a JSON object renders one block per key — string
+// values raw (real newlines, no \n escapes), everything else pretty-printed
+// with light syntax color. Non-JSON text falls back to the plain preview.
+function renderPayload(host, text) {
+  let parsed;
+  const t = (text || "").trim();
+  if (t[0] === "{" || t[0] === "[") { try { parsed = JSON.parse(t); } catch (e) {} }
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length) {
+    for (const [k, v] of Object.entries(parsed)) {
+      const kv = document.createElement("div"); kv.className = "kv";
+      const key = document.createElement("div"); key.className = "kv-key"; key.textContent = k;
+      const pre = document.createElement("pre"); pre.className = "code-block";
+      if (typeof v === "string") pre.textContent = v;
+      else pre.innerHTML = highlightJson(JSON.stringify(v, null, 2));
+      kv.append(key, pre); host.appendChild(kv);
+    }
+    return;
+  }
+  if (parsed && typeof parsed === "object") {  // array or bare {} → one pretty block
+    const pre = document.createElement("pre"); pre.className = "code-block";
+    pre.innerHTML = highlightJson(JSON.stringify(parsed, null, 2));
+    host.appendChild(pre);
+    return;
+  }
+  const pv = document.createElement("div"); pv.className = "preview";
+  pv.textContent = text;
+  host.appendChild(pv);
+}
+
+// Minimal JSON tokenizer for display color; input is escaped first.
+function highlightJson(src) {
+  const esc = src.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return esc.replace(
+    /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g,
+    (tok, str, colon, kw) => {
+      if (str) return colon ? '<span class="j-key">' + str + "</span>" + colon
+                            : '<span class="j-str">' + str + "</span>";
+      if (kw) return '<span class="j-kw">' + kw + "</span>";
+      return '<span class="j-num">' + tok + "</span>";
+    }
+  );
+}
+
 function makeGhost(toolCall) {
   const fn = toolCall.function || {};
   const card = document.createElement("div");
@@ -658,8 +770,8 @@ function makeGhost(toolCall) {
   meta.append(chip("tool-name", fn.name || "tool"), chip("flag", "no result yet"));
   card.appendChild(meta);
   if (fn.arguments) {
-    const pv = document.createElement("div"); pv.className = "preview muted";
-    pv.textContent = fn.arguments;
+    const pv = document.createElement("div"); pv.className = "summary muted";
+    pv.textContent = oneLine(argsSummary(fn));
     card.appendChild(pv);
   }
   return card;
@@ -676,8 +788,15 @@ function makeCard(m, opts = {}) {
     return card;
   }
 
+  const expanded = state.expanded.has(m._uid);
+  card.classList.add(expanded ? "open" : "closed");
+
   const meta = document.createElement("div");
   meta.className = "meta";
+  const caret = document.createElement("span");
+  caret.className = "caret";
+  caret.textContent = "▸";
+  meta.appendChild(caret);
   const tag = document.createElement("span");
   tag.className = "role-tag";
   tag.textContent = m.role || "?";
@@ -694,39 +813,86 @@ function makeCard(m, opts = {}) {
   time.textContent = (m.created_at || "").replace("T", " ").replace("Z", "");
   time.title = m.created_at || "";
   meta.appendChild(time);
-  const hint = document.createElement("span");
-  hint.className = "edit-hint";
-  hint.textContent = "✎ edit";
-  meta.appendChild(hint);
+  meta.appendChild(btn("✎ edit", "ghost small edit-btn", () => openEditor(m._uid)));
   card.appendChild(meta);
 
   const text = previewText(m);
   const calls = m.role === "assistant" && Array.isArray(m.tool_calls) ? m.tool_calls : [];
-  if (text) {
-    const w = document.createElement("div"); w.className = "pv-wrap";
-    const pv = document.createElement("div"); pv.className = "preview";
-    pv.textContent = text;
-    w.appendChild(pv); card.appendChild(w);
-  } else if (!calls.length) {
-    const pv = document.createElement("div"); pv.className = "preview muted";
-    pv.textContent = "(empty)";
-    card.appendChild(pv);
-  }
-  for (const tc of calls) {
-    const fn = tc.function || {};
-    const line = document.createElement("div"); line.className = "tc-line";
-    line.appendChild(chip("tool-name", fn.name || "?"));
-    const code = document.createElement("code");
-    code.textContent = fn.arguments || "";
-    line.appendChild(code);
-    card.appendChild(line);
+
+  if (expanded) {
+    if (text) {
+      const w = document.createElement("div"); w.className = "pv-wrap";
+      if (m.role === "tool") renderPayload(w, text);   // tool results are often JSON
+      else {
+        const pv = document.createElement("div"); pv.className = "preview";
+        pv.textContent = text;
+        w.appendChild(pv);
+      }
+      card.appendChild(w);
+    } else if (!calls.length) {
+      const pv = document.createElement("div"); pv.className = "preview muted";
+      pv.textContent = "(empty)";
+      card.appendChild(pv);
+    }
+    for (const tc of calls) {
+      const fn = tc.function || {};
+      const block = document.createElement("div"); block.className = "tc-block";
+      const head = document.createElement("div"); head.className = "tc-block-head";
+      head.appendChild(chip("tool-name", fn.name || "?"));
+      if (tc.id) {
+        const id = document.createElement("span"); id.className = "idx";
+        id.textContent = tc.id;
+        head.appendChild(id);
+      }
+      block.appendChild(head);
+      const w = document.createElement("div"); w.className = "pv-wrap";
+      renderPayload(w, fn.arguments || "");
+      block.appendChild(w);
+      card.appendChild(block);
+    }
+  } else {
+    if (text) {
+      const s = document.createElement("div"); s.className = "summary";
+      s.textContent = oneLine(text);
+      card.appendChild(s);
+    } else if (!calls.length) {
+      const s = document.createElement("div"); s.className = "summary muted";
+      s.textContent = "(empty)";
+      card.appendChild(s);
+    }
+    for (const tc of calls) {
+      const fn = tc.function || {};
+      const line = document.createElement("div"); line.className = "tc-line";
+      line.appendChild(chip("tool-name", fn.name || "?"));
+      const code = document.createElement("code");
+      code.textContent = oneLine(argsSummary(fn));
+      line.appendChild(code);
+      card.appendChild(line);
+    }
   }
 
   card.addEventListener("click", (e) => {
     if (e.target.closest("button, a, input, select, textarea")) return;
-    openEditor(m._uid);
+    const sel = window.getSelection && window.getSelection();
+    if (sel && sel.toString()) return;   // selecting text, not toggling
+    toggleExpand(m._uid);
   });
   return card;
+}
+
+function toggleExpand(uid) {
+  if (!state.expanded.delete(uid)) state.expanded.add(uid);
+  renderThread();
+}
+
+function allExpanded() {
+  return state.messages.length > 0 && state.messages.every((m) => state.expanded.has(m._uid));
+}
+
+function updateExpandBtn() {
+  const all = allExpanded();
+  $("#expand-ico").textContent = all ? "⊟" : "⊞";
+  $("#expand-lbl").textContent = all ? "Collapse" : "Expand";
 }
 
 function chip(cls, text) {
@@ -739,6 +905,7 @@ function chip(cls, text) {
 function openEditor(uid) {
   if (state.editingUid === uid) return;
   state.editingUid = uid;
+  state.expanded.add(uid);   // leave the card open when the editor closes
   state.rawMode = false;
   state.justOpened = true;
   renderThread();
@@ -842,11 +1009,21 @@ function renderToolCallsEditor(host, m) {
     card.appendChild(wrapField("call id", textInput(tc.id || "", (v) => { tc.id = v; setDirty(true); })));
 
     const argsWrap = document.createElement("div"); argsWrap.className = "field";
+    const lr = document.createElement("div"); lr.className = "label-row";
     const al = document.createElement("label"); al.textContent = "arguments (JSON string)";
     const at = document.createElement("textarea"); at.value = tc.function.arguments || "";
     const hint = document.createElement("div"); hint.className = "hint";
+    lr.append(al, btn("{ } Format", "ghost small", () => {
+      let pretty;
+      try { pretty = JSON.stringify(JSON.parse(at.value), null, 2); }
+      catch (e) { toast("arguments are not valid JSON", "err"); return; }
+      if (pretty === at.value) return;
+      at.value = pretty;
+      tc.function.arguments = pretty;
+      setDirty(true); validateArgs(at, hint);
+    }));
     at.addEventListener("input", () => { tc.function.arguments = at.value; setDirty(true); validateArgs(at, hint); });
-    argsWrap.append(al, at, hint); validateArgs(at, hint);
+    argsWrap.append(lr, at, hint); validateArgs(at, hint);
     card.appendChild(argsWrap);
     box.appendChild(card);
   });
@@ -1009,6 +1186,11 @@ function toast(msg, kind) {
 // Wire up
 // ---------------------------------------------------------------------------
 $("#theme-btn").addEventListener("click", toggleTheme);
+$("#expand-btn").addEventListener("click", () => {
+  if (allExpanded()) state.expanded.clear();
+  else for (const m of state.messages) state.expanded.add(m._uid);
+  renderThread();
+});
 $("#reload-btn").addEventListener("click", load);
 $("#save-btn").addEventListener("click", () => save(false));
 document.addEventListener("keydown", (e) => {

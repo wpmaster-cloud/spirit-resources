@@ -17,7 +17,7 @@
 #
 # Connection: set DATABASE_URL=postgres://user:pass@host:5432/db  (or the
 #   standard PGHOST/PGUSER/PGPASSWORD/PGDATABASE vars).
-# Embeddings: reuses the agent's LLM creds — BASE_URL + API_KEY — calling
+# Embeddings: reuses the agent's LLM creds — BASE_URL + LLM_API_KEY — calling
 #   /embeddings (EMBED_MODEL, default text-embedding-3-small; EMBED_DIM 1536).
 #   Override with MEMORY_EMBEDDER=<cmd> (gets text on $1, prints a JSON array)
 #   to use a local embedder.
@@ -35,17 +35,17 @@ sql() { "${PSQL[@]}" "$@"; }   # ON_ERROR_STOP aborts a multi-statement batch on
 
 embed() {  # text -> JSON array literal, e.g. [0.1,-0.2,...]
   if [ -n "${MEMORY_EMBEDDER:-}" ]; then "$MEMORY_EMBEDDER" "$1"; return; fi
-  : "${BASE_URL:?set BASE_URL}" "${API_KEY:?set API_KEY}"
+  : "${BASE_URL:?set BASE_URL}" "${LLM_API_KEY:?set LLM_API_KEY}"
   curl -fsS "${BASE_URL%/}/embeddings" \
-    -H "Authorization: Bearer ${API_KEY}" -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${LLM_API_KEY}" -H 'Content-Type: application/json' \
     -d "$(jq -nc --arg m "$EMBED_MODEL" --arg i "$1" '{model:$m,input:$i}')" \
     | jq -ce '.data[0].embedding' || die "embedding request failed"
 }
 
 chat() {   # user text -> assistant text (used by consolidate)
-  : "${BASE_URL:?set BASE_URL}" "${API_KEY:?set API_KEY}"
+  : "${BASE_URL:?set BASE_URL}" "${LLM_API_KEY:?set LLM_API_KEY}"
   curl -fsS "${BASE_URL%/}/chat/completions" \
-    -H "Authorization: Bearer ${API_KEY}" -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${LLM_API_KEY}" -H 'Content-Type: application/json' \
     -d "$(jq -nc --arg m "$CHAT_MODEL" --arg c "$1" '{model:$m,messages:[{role:"user",content:$c}]}')" \
     | jq -r '.choices[0].message.content // ""'
 }

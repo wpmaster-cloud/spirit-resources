@@ -50,7 +50,7 @@ or run the `pgvector/pgvector:pg16` image as a service. Then:
 ```bash
 export DATABASE_URL='postgres://postgres@localhost:5432/postgres'   # or PG* vars
 # embeddings reuse the agent's own LLM creds:
-export BASE_URL="$BASE_URL" API_KEY="$API_KEY"                      # already in the agent's env
+export BASE_URL="$BASE_URL" LLM_API_KEY="$LLM_API_KEY"              # already in the agent's env
 export EMBED_MODEL=text-embedding-3-small EMBED_DIM=1536            # must match your model
 
 bash scripts/memory.sh init
@@ -106,7 +106,7 @@ A capable agent uses memory on both ends of a turn:
 
 ## Notes
 
-- The connection (`DATABASE_URL`/`PG*`) and `API_KEY` are secrets — never echo
+- The connection (`DATABASE_URL`/`PG*`) and `LLM_API_KEY` are secrets — never echo
   them or write them into memories.
 - One shared DB can serve a whole fleet; give each agent its own table
   (`MEMORY_TABLE` is not implemented — use a separate database/schema per agent

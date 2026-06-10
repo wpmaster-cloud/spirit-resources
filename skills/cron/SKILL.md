@@ -25,8 +25,8 @@ skills/agent-workshop); this skill is for hosts (macOS, Linux servers).
   filter, so existing entries survive.
 - Cron runs with a minimal environment: no PATH from your shell, no exported
   keys. Use absolute paths and `cd` into the agent folder; the API key must be
-  reachable (the `API_KEY` variable inside that agent's `agent.sh`, or set it
-  inline in the cron line).
+  reachable (`LLM_API_KEY` in that agent's `agent.env`, or set it inline in
+  the cron line).
 
 ## Recipes
 

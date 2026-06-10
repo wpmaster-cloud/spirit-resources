@@ -43,8 +43,7 @@ Facts you rely on:
 - Config precedence, highest first: real environment → `agent.env` beside the
   script (strict KEY=VALUE lines) → BASE_URL/MODEL auto-detected from the API
   key's prefix (OpenAI, Anthropic, OpenRouter, Groq, xAI, Gemini) → defaults.
-  Values: `AGENT_NAME`, `MODEL`, `BASE_URL`,
-  `API_KEY`/`BASH_AGENT_API_KEY`/`OPENAI_API_KEY`, `MAX_TURNS`,
+  Values: `AGENT_NAME`, `MODEL`, `BASE_URL`, `LLM_API_KEY`, `MAX_TURNS`,
   `COMMAND_TIMEOUT_SEC`, `CONTEXT_COMPACT_TOKENS`, `SESSION_FILE`.
   Pin per-agent behavior in `agent.env`; keep API keys in the environment (or
   a secret store), never in files you ship or commit.
