@@ -33,17 +33,20 @@ write test cases, run them, and iterate. Maybe they already have a draft — go
 straight to the test/iterate loop. And be flexible: if they say "I don't need
 evaluations, just vibe with me," do that instead.
 
-## How skills work in Dynamo
+## How skills work in spirit
 
-A skill is just a folder under `workspace/skills/<name>/` containing a `SKILL.md`
-(YAML frontmatter + markdown), optionally with bundled `scripts/`, `references/`,
-and `assets/`. Discovery uses **progressive disclosure**: `list_skills` / `load_skills`
-surface the name + description of every skill; the agent then `read_file`s the full
-`SKILL.md` only when a task matches, and runs any bundled scripts via `run_command`
-(whose working directory is the workspace root, so a script is invoked as
-`run_command` → `bash skills/<name>/scripts/foo.sh`). There is no `.skill` package
-format here — to "install" a skill you simply create its folder under
-`workspace/skills/`.
+A skill is just a folder under `skills/<name>/` in the resources repo
+(github.com/wpmaster-cloud/spirit-resources) containing a `SKILL.md` (YAML
+frontmatter + markdown), optionally with bundled `scripts/` and `references/`.
+Skills are **instructions the agent fetches, not installed code**: an agent
+clones or downloads the skill folder into its workspace on demand, reads the
+full `SKILL.md` with `run_command` (`cat skills/<name>/SKILL.md`) when a task
+matches the description, and runs any bundled scripts the same way
+(`bash skills/<name>/scripts/foo.sh` from the agent's folder). Discovery is
+**progressive disclosure**: name + description first (a directory listing or a
+skills index in the agent's session), the body only when needed. There is no
+`.skill` package format — to "install" a skill you simply create its folder
+under `skills/`.
 
 ## Communicating with the user
 
@@ -189,8 +192,8 @@ For each test prompt, compare **with the skill** against a **baseline**:
   with the *previous* version (when improving one — snapshot it first with
   `cp -r skills/<name> /tmp/<name>-snapshot`).
 
-If subagents are available (via `run_session` / a DAG, or the Agent tool), spawn the
-with-skill and baseline runs in parallel so they finish together and you get an
+If you can spawn subagents (see skills/agent-workshop), run the with-skill and
+baseline runs as two separate agents so they finish together and you get an
 independent perspective. If not, just run them inline, one at a time — you wrote the
 skill and you're running it, so it's less rigorous, but the human review step
 compensates.
@@ -249,8 +252,9 @@ optimizer isn't bundled in this workspace).
 
 ### How triggering works
 
-Skills appear in the agent's catalog (via `list_skills` / `load_skills`) as name +
-description, and the agent decides whether to read the full `SKILL.md` based on that
+Skills surface to the agent as name + description (a skills index in its session,
+or a directory listing of `skills/`), and the agent decides whether to read the
+full `SKILL.md` based on that
 description. Crucially, the agent only consults skills for tasks it can't trivially
 handle itself — a one-step "read this PDF" may not trigger a skill even on a perfect
 description, because basic tools already cover it. Complex, multi-step, or

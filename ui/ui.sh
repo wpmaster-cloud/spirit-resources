@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spin up the bash-agent session editor UI.
+# Spin up the spirit-agent session editor UI.
 #
 # Usage:
 #   ./ui.sh --session /path/to/agent/session.jsonl   # edit an agent's session

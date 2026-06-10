@@ -1,7 +1,7 @@
 ---
 name: web-extraction
 requires: python3, node
-description: Read web pages and extract content/data as clean markdown. Two tools in one skill — Defuddle (a slim CLI, best for simple readable pages like news, blogs, articles, and docs) and Crawl4AI (a full Python toolkit for JavaScript-heavy pages, structured/schema extraction, batch crawling, and authenticated sessions). Use whenever the user gives a URL to read or analyze, wants to scrape a site, extract structured data, handle JS-rendered pages, crawl multiple URLs, or build a web data pipeline. Prefer this over WebFetch for standard web pages to save tokens. Do NOT use for URLs ending in .md — those are already markdown, use WebFetch directly.
+description: Read web pages and extract content/data as clean markdown. Two tools in one skill — Defuddle (a slim CLI, best for simple readable pages like news, blogs, articles, and docs) and Crawl4AI (a full Python toolkit for JavaScript-heavy pages, structured/schema extraction, batch crawling, and authenticated sessions). Use whenever the user gives a URL to read or analyze, wants to scrape a site, extract structured data, handle JS-rendered pages, crawl multiple URLs, or build a web data pipeline. Prefer this over a raw curl fetch for standard web pages to save tokens. Do NOT use for URLs ending in .md — those are already markdown, just curl them.
 version: 0.7.4
 crawl4ai_version: ">=0.7.4"
 last_updated: 2026-06-06
@@ -17,6 +17,8 @@ This skill provides two complementary ways to turn web pages into clean, LLM-rea
 - **Crawl4AI** — a full Python toolkit with a headless browser. Heavier, but handles JavaScript rendering, structured/schema-based extraction, concurrent batch crawls, deep crawling, and authenticated sessions.
 
 They overlap (both produce markdown from a URL), so reach for the lightest tool that does the job.
+
+Don't have a URL yet? That's the **web-search** skill — search first, then extract here.
 
 ## Choosing your tool
 
@@ -37,7 +39,7 @@ They overlap (both produce markdown from a URL), so reach for the lightest tool 
 
 # Defuddle (slim path)
 
-Extract clean readable content from a web page with a single command. Prefer over WebFetch for standard pages — it removes navigation, ads, and clutter, reducing token usage.
+Extract clean readable content from a web page with a single command. Prefer it over fetching raw HTML with curl for standard pages — it removes navigation, ads, and clutter, reducing token usage.
 
 If not installed: `npm install -g defuddle`
 

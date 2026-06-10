@@ -7,8 +7,8 @@ description: >
   them on Telegram, send a notification or alert to a phone, "ping me when done",
   read incoming Telegram messages, poll for replies, or run a two-way Telegram chat
   / bot / assistant. Covers sendMessage (outgoing) and getUpdates (incoming, with
-  offset memory so each message is read once), plus a ready-made conversational DAG
-  + cronjob that turns the runtime into a Telegram chatbot. Trigger phrases:
+  offset memory so each message is read once), plus a cron wake pattern that turns
+  the agent into a Telegram chatbot. Trigger phrases:
   "telegram", "text me", "message me on telegram", "telegram bot", "notify me",
   "send me an alert", "read my telegram", "reply to telegram", "chat over telegram".
 ---
@@ -29,10 +29,8 @@ skills/telegram/
 │   ├── tg_setup.sh             # verify token, clear webhook, discover your chat id
 │   ├── tg_send.sh              # send a message
 │   └── tg_read.sh              # read NEW messages (remembers what it already saw)
-├── references/
-│   └── bot-api.md              # extended reference: more methods, parse modes, errors
-└── assets/
-    └── telegram-conversation.dag.json   # ready conversational-bot DAG
+└── references/
+    └── bot-api.md              # extended reference: more methods, parse modes, errors
 ```
 
 All commands below assume the agent's `run_command`, whose working directory is the
@@ -45,22 +43,24 @@ All commands below assume the agent's `run_command`, whose working directory is 
 
 **b. Store credentials.** Two options (pick one):
 
-- **Env vars (recommended, secret-safe).** Add to `agent/.env`:
+- **Env vars (recommended, secret-safe).** Put these in the environment the
+  agent process starts with — the shell/cron line that launches `agent.sh`, or
+  the pod's Secret-backed `env:` for a containerized agent (the runtime does
+  **not** read a `.env` file):
   ```
   TELEGRAM_BOT_TOKEN=123456789:AAE...
   TELEGRAM_CHAT_ID=               # fill in after step c
   ```
-  These load into the process env at boot and are inherited by `run_command`, so
-  the **token never appears in the transcript**. `agent/.env` is git-ignored.
-  Requires an agent restart to take effect.
+  `run_command` children inherit the agent's environment, so the **token never
+  appears in the transcript**.
 
-- **Config file (no restart).** Copy the template and fill it in:
+- **Config file.** Copy the template and fill it in:
   ```bash
   cp skills/telegram/config.env.example telegram/config.env
   # then edit telegram/config.env
   ```
-  The scripts auto-source `telegram/config.env`. Add `telegram/config.env` to
-  `workspace/.gitignore` so the token isn't committed.
+  The scripts auto-source `telegram/config.env`. Make sure it's git-ignored in
+  the agent's folder so the token isn't committed.
 
 Env vars win over the config file when both are present.
 
@@ -83,7 +83,7 @@ bash skills/telegram/scripts/tg_send.sh "Build finished ✅ — 0 failures."
 bash skills/telegram/scripts/tg_send.sh --chat 12345 --reply-to 678 --silent "ack"
 
 # long body via stdin
-read_file ... | ... ; echo "$BODY" | bash skills/telegram/scripts/tg_send.sh --stdin
+echo "$BODY" | bash skills/telegram/scripts/tg_send.sh --stdin
 
 # formatted (you MUST escape — see references/bot-api.md)
 bash skills/telegram/scripts/tg_send.sh --parse HTML "<b>Done</b> in <code>3s</code>"
@@ -111,54 +111,43 @@ Output is one line per message:
 ```
 <update_id>  [<chat_id>]  <name> @username: <text>   [photo]/[document: …] for non-text
 ```
+(`--limit <n>` caps how many updates one call returns; default 100.)
+
 **Offset memory:** the script stores the last seen `update_id + 1` in
 `telegram/offset` and passes it as the next `getUpdates` offset. This both filters
 out already-seen messages **and** tells Telegram to drop them server-side, so each
 message is returned exactly once. Reading **consumes** — use `--peek` to look
 without advancing, `--reset` to forget and re-read the backlog.
 
-## 4. A two-way conversation (the DAG + cron pattern)
+## 4. A two-way conversation (the cron wake pattern)
 
-To make the runtime an actual Telegram assistant that reads incoming messages and
-replies on a schedule, install the bundled DAG and a cronjob. The DAG is an
-`autonomous_agent` loop; the cron fires it on a fixed cadence against **one stable
-session**, so the agent accumulates the whole conversation (a `compact` before-turn
-hook keeps context bounded).
+To make the agent an actual Telegram assistant that reads incoming messages and
+replies on a schedule, give it a standing wake (see the **cron** skill on a host,
+or the wake-loop `command:` in `ops/agent.yaml` for a container). Every firing is
+a one-shot run against the agent's **one session**, so the conversation
+accumulates naturally and `compact_session` keeps it bounded.
 
-**Install the DAG** (use the `create_dag` tool with the asset's contents — read
-`skills/telegram/assets/telegram-conversation.dag.json` and pass it as the `dag`
-argument; validate first with `dry_run: true`).
-
-**Create the cronjob** (use the `create_cronjob` tool):
-```jsonc
-{
-  "name": "Telegram poller",
-  "schedule": "* * * * *",              // every minute (smallest cron granularity)
-  "dag_id": "telegram-conversation",
-  "session_id": "telegram-bot",          // stable session ⇒ remembered conversation
-  "mission": "Check Telegram for new messages now by running `bash skills/telegram/scripts/tg_read.sh`. For each new message directed at you, write a helpful reply and send it with `bash skills/telegram/scripts/tg_send.sh --chat <CHAT_ID> --reply-to <UPDATE/MESSAGE_ID> \"...\"`. If there are no new messages, simply state that and stop — never send an unprompted message."
-}
+```cron
+* * * * * cd /abs/path/agents/telegram-bot && ./agent.sh "Wake: check Telegram by running bash skills/telegram/scripts/tg_read.sh. For each new message directed at you, write a helpful reply and send it with bash skills/telegram/scripts/tg_send.sh --chat <CHAT_ID> --reply-to <MESSAGE_ID> '...'. If there are no new messages, reply exactly: idle." >> cron.log 2>&1 # spirit-agent:telegram-poll
 ```
 
-How it fits together (mechanics that make this work):
-- Each cron firing appends the `mission` as a fresh user message to the
-  `telegram-bot` session, then runs the DAG. So every minute the agent is told
-  "go check Telegram."
-- `bootstrap_tools` (`read_file skills/telegram/SKILL.md` + `load_skills`) run
-  **only on the first firing** and persist in the reused session, so the agent
-  keeps the skill instructions in context without re-reading them each time.
-- A typical firing is ~3 turns: read → (reply if needed) → finish. The loop ends
-  when the model answers with no tool call.
+Mechanics that make this work:
+- Each firing appends the wake text as a user message and runs one turn loop;
+  a wake that lands mid-run exits 75 harmlessly (the next one catches up).
+- Bake the standing instructions (role, reply style, "never send unprompted
+  messages") into the agent's **system prompt** so the per-wake message stays
+  short — see skills/agent-workshop for authoring a session.
+- A typical firing is ~3 model calls: read → (reply if needed) → finish.
 
-For snappier (sub-minute) responsiveness, instead of a 1-minute cron you can have a
-single firing long-poll a few times in a row (`tg_read.sh --timeout 25`) within one
-mission. The 1-minute cron is the simplest, most robust default.
+For snappier (sub-minute) responsiveness, have a single firing long-poll a few
+times in a row (`tg_read.sh --timeout 25`) within one wake. The 1-minute cron is
+the simplest, most robust default.
 
 **Other uses of the same building blocks:**
-- *Notifications / alerts* — drop a single `tg_send.sh` step into any DAG or
-  `procedure` to ping the user when a job finishes or fails.
-- *Ad-hoc* — when the user says "text me when X", just call `tg_send.sh` directly;
-  no DAG needed.
+- *Notifications / alerts* — call `tg_send.sh` at the end of any long task to
+  ping the user when it finishes or fails.
+- *Ad-hoc* — when the user says "text me when X", just call `tg_send.sh`
+  directly; no standing wake needed.
 
 ## Gotchas (read before debugging)
 

@@ -42,18 +42,21 @@ Account → Security → App passwords; iCloud/Yahoo/Outlook similar — see
 
 **b. Store credentials.** Two options (pick one):
 
-- **Env vars (recommended, secret-safe).** Add to `agent/.env`:
+- **Env vars (recommended, secret-safe).** Put these in the environment the
+  agent process starts with — the shell/cron line that launches `agent.sh`, or
+  the pod's Secret-backed `env:` for a containerized agent (the runtime does
+  **not** read a `.env` file):
   ```
   EMAIL_ADDRESS=you@gmail.com
   EMAIL_PASSWORD=your-app-password
   EMAIL_PROVIDER=gmail          # auto-fills IMAP/SMTP hosts; see providers.md
   ```
-  These load into the process env at boot and are inherited by `run_command`, so
-  the **password never appears in the transcript**. Requires an agent restart.
+  `run_command` children inherit the agent's environment, so the **password
+  never appears in the transcript**.
 
-- **Config file (no restart).** `cp skills/email/config.env.example email/config.env`,
-  fill it in, and add `email/config.env` to `workspace/.gitignore`. The scripts
-  auto-source it. Env vars win when both are set.
+- **Config file.** `cp skills/email/config.env.example email/config.env`,
+  fill it in, and make sure `email/config.env` is git-ignored in the agent's
+  folder. The scripts auto-source it. Env vars win when both are set.
 
 For a host not in the preset list, set `IMAP_HOST`/`IMAP_PORT`/`SMTP_HOST`/`SMTP_PORT`
 explicitly instead of `EMAIL_PROVIDER`.
@@ -124,6 +127,9 @@ recent). For complex queries use `--search` with raw IMAP criteria.
 - **Marking read** — `email_read.py` peeks by default; only `--mark-seen` changes
   flags. Good for polling without disturbing the user's unread state.
 - **Rate limits** — Gmail caps ~500 recipients/day on free accounts; don't bulk-send.
+- **Kubernetes pods** — the stock NetworkPolicy in `ops/agent.yaml` only allows
+  egress on 53/443/80, so IMAP (993) and SMTP (587/465) are blocked from a
+  deployed agent until those ports are added to the policy.
 - **Attachments** are read from the workspace; size limits are provider-dependent
   (~25 MB typical).
 

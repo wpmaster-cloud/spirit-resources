@@ -1,6 +1,6 @@
 ---
 name: qdrant
-requires: python3, podman
+requires: python3
 description: "Build RAG pipelines and semantic search with Qdrant. Use when the mission involves storing or querying vector embeddings, retrieval-augmented generation, semantic similarity search, or payload-filtered vector lookup."
 ---
 
@@ -19,13 +19,17 @@ pip install "qdrant-client[fastembed]"   # includes local embedding via ONNX
 pip install qdrant-client                 # vector ops only, bring your own embeddings
 ```
 
+Need a server (beyond `:memory:`/local-path mode)? Get the static binary with
+the **install-runtimes** skill (`bash skills/install-runtimes/scripts/get.sh
+qdrant`, REST on :6333), or run the `qdrant/qdrant` image with podman/docker.
+
 ## Client initialization
 
 ```python
 from qdrant_client import QdrantClient
 
 # In-memory — dev/testing, ephemeral
-client = QdrantClient(":memory:")
+client = QdrantClient(":memory:")  # needs no server at all
 
 # Persistent local disk
 client = QdrantClient(path="/data/qdrant")

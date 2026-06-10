@@ -12,12 +12,11 @@ This skill covers only what **differs** from Docker.
 
 ## Prerequisites
 
-The runtime is **Debian 12 (Bookworm) on arm64**. Podman is in Debian's official repo with arm64 support — no external repo needed.
-
-- Official install docs: https://podman.io/docs/installation
-- Debian 12 package: https://packages.debian.org/bookworm/podman
+Check the host first (`uname -sm`; `cat /etc/os-release` on Linux) and install
+with its package manager — official docs: https://podman.io/docs/installation
 
 ```bash
+# Debian/Ubuntu
 apt-get update && apt-get install -y \
   podman \
   podman-netavark \   # default network backend
@@ -25,8 +24,14 @@ apt-get update && apt-get install -y \
   uidmap \            # user namespace UID mapping
   fuse-overlayfs      # rootless overlay storage
 
+# Alpine:  apk add podman fuse-overlayfs slirp4netns
+# macOS:   brew install podman && podman machine init && podman machine start
+
 podman info   # verify runtime is reachable
 ```
+
+Note: podman won't run *inside* the spirit k8s pod (non-root, all capabilities
+dropped) — it's for hosts the agent controls.
 
 ## Key differences from Docker
 
@@ -46,6 +51,19 @@ Rootless containers map UID 0 inside the container to the invoking user outside 
 ```bash
 podman unshare cat /proc/self/uid_map   # inspect UID mapping
 ```
+
+## Volumes: always mount from the agent's folder (`./`)
+
+The pod this agent runs in is ephemeral — only files inside the agent's own folder survive, because the agent commits and pushes that folder to a git remote. Every podman volume must therefore bind-mount a path **inside the agent's local folder `./`**, never anywhere else:
+
+```bash
+mkdir -p ./data
+podman run -v "$PWD/data:/app/data" myapp:latest   # ✔ lands in the agent's folder → git push persists it
+podman run -v /tmp/data:/app/data myapp:latest     # ✘ outside ./ — gone on pod replacement
+podman volume create mydata                        # ✘ named volumes live outside ./ — same fate
+```
+
+This is the mechanism for session saving, backups, and any file a container produces that must outlive the pod. For bigger data (large datasets, media, anything unfit for a git repo), use a different persistence method — object storage, an external database — not the GitHub repo.
 
 ## SELinux volume mounts
 
@@ -79,7 +97,7 @@ systemctl --user enable --now container-web.service
 
 ## arm64 notes
 
-This runtime is linux/arm64. Pull images that explicitly support `linux/arm64`; amd64-only images will fail or run slowly under emulation. Specify the platform when needed:
+On an arm64 host (`uname -m` → `aarch64`/`arm64`), pull images that explicitly support `linux/arm64`; amd64-only images will fail or run slowly under emulation. Specify the platform when needed:
 
 ```bash
 podman pull --platform linux/arm64 myimage:latest
@@ -89,6 +107,7 @@ podman build --platform linux/arm64 -t myapp:latest .
 ## Guardrails
 
 - Run `podman info` first to confirm the runtime is reachable.
+- Bind-mount volumes only from inside the agent's folder (`./`) — commit/push is the persistence layer; named volumes and paths outside `./` die with the pod.
 - Use `:Z` on bind mounts when on an SELinux host.
 - Prefer `--rm` for one-shot tasks.
 - Never run `podman system prune -a` without explicit user confirmation.

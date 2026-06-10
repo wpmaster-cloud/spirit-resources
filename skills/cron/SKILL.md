@@ -13,39 +13,40 @@ requires: crontab
 # Cron
 
 Schedule work on the host with `crontab`. In a container there is usually no
-cron daemon — use the deployment's `AGENT_INTERVAL` env instead (see
-skills/agent-workshop); this skill is for hosts (macOS, Linux servers).
+cron daemon — swap the pod's command for a wake loop instead (see the commented
+`command:` in `ops/agent.yaml`: `while true; do ./agent.sh "Wake: ..."; sleep
+300; done`); this skill is for hosts (macOS, Linux servers).
 
 ## Rules
 
 - **Tag every entry you create** with a trailing marker comment
-  `# bash-agent:<job-name>` so it can be listed and removed exactly, without
+  `# spirit-agent:<job-name>` so it can be listed and removed exactly, without
   touching entries owned by the user or other tools.
 - Never replace the whole crontab blind: always start from `crontab -l` and
   filter, so existing entries survive.
 - Cron runs with a minimal environment: no PATH from your shell, no exported
   keys. Use absolute paths and `cd` into the agent folder; the API key must be
-  reachable (`LLM_API_KEY` in that agent's `agent.env`, or set it inline in
-  the cron line).
+  reachable (`LLM_API_KEY` in the environment, or set it inline in the cron
+  line).
 
 ## Recipes
 
 ```bash
 # List everything / only your entries
 crontab -l 2>/dev/null
-crontab -l 2>/dev/null | grep -F '# bash-agent:'
+crontab -l 2>/dev/null | grep -F '# spirit-agent:'
 
 # Add an entry (append, keep the rest)
 ( crontab -l 2>/dev/null
-  printf '%s\n' '*/15 * * * * cd /abs/path/agents/researcher && ./agent.sh "Wake: continue your standing task. If nothing pending, reply exactly: idle." >> cron.log 2>&1 # bash-agent:researcher-wake'
+  printf '%s\n' '*/15 * * * * cd /abs/path/agents/researcher && ./agent.sh "Wake: continue your standing task. If nothing pending, reply exactly: idle." >> cron.log 2>&1 # spirit-agent:researcher-wake'
 ) | crontab -
 
 # Remove one of your entries by its marker
-crontab -l 2>/dev/null | grep -vF '# bash-agent:researcher-wake' | crontab -
+crontab -l 2>/dev/null | grep -vF '# spirit-agent:researcher-wake' | crontab -
 
 # One-time job: the line removes itself after running
 ( crontab -l 2>/dev/null
-  printf '%s\n' '30 9 14 6 * cd /abs/path && ./agent.sh "send the report" >> cron.log 2>&1; crontab -l | grep -vF "# bash-agent:once-report" | crontab - # bash-agent:once-report'
+  printf '%s\n' '30 9 14 6 * cd /abs/path && ./agent.sh "send the report" >> cron.log 2>&1; crontab -l | grep -vF "# spirit-agent:once-report" | crontab - # spirit-agent:once-report'
 ) | crontab -
 ```
 

@@ -49,9 +49,10 @@ python3 skills/data-analysis/scripts/profile.py data.csv
 python3 skills/data-analysis/scripts/profile.py data.parquet --json
 ```
 It prints rows × columns, and per column: inferred type, null count/%, distinct
-count, min/max (and mean for numerics), and sample values. CSV/TSV/JSON/JSONL and
-XLSX work with **no dependencies** (it streams, so big CSVs are fine); Parquet uses
-DuckDB or pandas if installed.
+count, min/max (and mean for numerics), and sample values. CSV/TSV/JSON/JSONL work
+with **no dependencies** (it streams, so big CSVs are fine); XLSX needs `openpyxl`,
+and Parquet uses DuckDB or pandas — the script says exactly what to install when a
+format's dependency is missing.
 
 ## SQL over files with DuckDB (no server)
 
@@ -94,8 +95,9 @@ The profiler needs nothing. For the rest:
 curl https://install.duckdb.org | sh     # DuckDB CLI (or: brew install duckdb)
 pip install duckdb pandas pyarrow matplotlib openpyxl
 ```
-`openpyxl` (already present) lets the profiler read `.xlsx`; `pyarrow` lets
-pandas/DuckDB read Parquet.
+`openpyxl` lets the profiler read `.xlsx`; `pyarrow` lets pandas/DuckDB read
+Parquet. No `python3`/`pip` on the machine at all? Get one with the
+**install-runtimes** skill (`uv`-managed Python works on Alpine too).
 
 ## Tips & gotchas
 

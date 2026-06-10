@@ -28,7 +28,7 @@ bash skills/markitdown/scripts/setup.sh
 `setup.sh` will:
 1. find a Python ≥ 3.10 (MarkItDown's minimum),
 2. install `markitdown[all]` via the first available isolated installer — `uv tool` → `pipx` → a dedicated venv (falling back to a `~/.local/bin/markitdown` shim),
-3. best-effort install the optional system deps `ffmpeg` + `exiftool` (only needed for audio transcription and image/audio metadata; `ffmpeg` is already present in the deployed image),
+3. best-effort install the optional system deps `ffmpeg` + `exiftool` via apt when available (only needed for audio transcription and image/audio metadata; skipped silently elsewhere — on Alpine/macOS install them yourself if needed),
 4. verify `markitdown --version`.
 
 **Install a subset instead of everything** (smaller, faster) by setting `MARKITDOWN_EXTRAS` before running setup:
@@ -54,10 +54,10 @@ pip install 'markitdown[all]'
 
 Available extras (install only what you need): `[all]`, `[pdf]`, `[docx]`, `[pptx]`, `[xlsx]`, `[xls]`, `[outlook]`, `[audio-transcription]`, `[youtube-transcription]`, `[az-doc-intel]`, `[az-content-understanding]`. Example: `pip install 'markitdown[pdf, docx, pptx]'`.
 
-On Debian (the agent runtime) if Python is missing:
-```bash
-sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip pipx
-```
+If Python ≥ 3.10 is missing entirely, get one with the **install-runtimes**
+skill (`uv`-managed CPython, works on Alpine/musl without root), or use the
+host's package manager (`apt-get install python3 python3-venv pipx` on Debian,
+`apk add python3 py3-pip` on Alpine with root, `brew install python` on macOS).
 
 ## Step 2 — Convert
 
@@ -139,7 +139,7 @@ docker run --rm -i markitdown:latest < your-file.pdf > output.md
 - **`markitdown: command not found` after install** — the venv shim may be at `~/.local/bin`; ensure it's on `PATH` (`export PATH="$HOME/.local/bin:$PATH"`), or call the venv binary directly (setup.sh prints its path).
 - **A format errors out / produces empty output** — that format's optional deps aren't installed. Re-run with `[all]` or add the specific extra (e.g. `pip install 'markitdown[pptx]'`).
 - **Audio transcription does nothing** — needs `[audio-transcription]` plus `ffmpeg` on the system.
-- **Python too old** — MarkItDown needs 3.10+. Install a newer Python (see Debian command above) and re-run `setup.sh`.
+- **Python too old** — MarkItDown needs 3.10+. Install a newer Python (see the install options above) and re-run `setup.sh`.
 - **Empty Markdown from a scanned PDF** — it's an image-only PDF; use the `markitdown-ocr` plugin with an LLM, or Azure Document Intelligence (`-d -e ...`).
 
 ## Files in this skill

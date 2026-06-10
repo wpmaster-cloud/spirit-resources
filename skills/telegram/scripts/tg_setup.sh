@@ -53,4 +53,4 @@ fi
 echo
 echo "Next: record your chat id where the scripts can read it, e.g."
 echo "  echo 'TELEGRAM_CHAT_ID=<id>' >> telegram/config.env"
-echo "  (or set TELEGRAM_CHAT_ID in agent/.env and restart the agent)"
+echo "  (or export TELEGRAM_CHAT_ID in the agent's environment)"

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Tiny session editor for bash-agent.
+// Tiny session editor for spirit-agent.
 //
 // A zero-dependency Node server (only the built-in http/fs/path modules) that
 // serves a browser UI for viewing and editing the agent's session.jsonl — the

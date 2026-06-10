@@ -9,7 +9,7 @@
 #   MARKITDOWN_EXTRAS   pip extras to install. Default: "all".
 #                       e.g. "pdf,docx,pptx,xlsx" for a smaller install.
 #   MARKITDOWN_HOME     where the venv fallback lives.
-#                       Default: ${DYNAMO_WORKSPACE:-$HOME}/.markitdown-venv
+#                       Default: $HOME/.markitdown-venv
 set -euo pipefail
 
 EXTRAS="${MARKITDOWN_EXTRAS:-all}"
@@ -55,7 +55,7 @@ fi
 
 # 3) dedicated venv fallback (+ shim on PATH)
 if [ "$installed" -eq 0 ]; then
-  VENV="${MARKITDOWN_HOME:-${DYNAMO_WORKSPACE:-$HOME}/.markitdown-venv}"
+  VENV="${MARKITDOWN_HOME:-$HOME/.markitdown-venv}"
   log "installing into venv: $VENV"
   "$PY" -m venv "$VENV"
   "$VENV/bin/pip" install --upgrade pip >/dev/null

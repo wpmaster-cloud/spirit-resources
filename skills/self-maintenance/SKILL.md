@@ -34,7 +34,7 @@ newest), move the others out of the folder, and rerun the checkup.
 wc -c "${s[0]}"                                       # > ~400000 bytes: compact soon
 jq -es 'length' "${s[0]}" >/dev/null 2>&1 && echo OK || echo CORRUPT
 ls "${s[0]}".bak.* 2>/dev/null | wc -l                # compaction backups piling up?
-ls .cmd-output.* .cmd-status.* .llm-response.* 2>/dev/null # crash droppings?
+ls .cmd-output.* .cmd-status.* .llm-payload.* .llm-response.* 2>/dev/null # crash droppings?
 ```
 
 If the session is OK but large, just call your `compact_session` tool (or, for
@@ -42,8 +42,10 @@ another agent, wake it with: "your session is large, compact it now").
 
 ## Repair a corrupt session
 
-A crash mid-append leaves a torn last line; the strict replay then refuses to
-start. Keep evidence, drop unparseable lines, then fix tool-call pairing:
+A crash mid-append leaves a torn last line. The replay tolerates this (it
+silently skips unparseable lines), but a skipped line can orphan a tool-call
+pair, and the API rejects the whole session when pairs don't match. Keep
+evidence, drop unparseable lines, then fix tool-call pairing:
 
 ```bash
 cp -- "${s[0]}" "${s[0]}.corrupt.$(date -u +%Y%m%dT%H%M%SZ)"
@@ -82,7 +84,7 @@ jq -es 'length' "${s[0]}" >/dev/null && echo repaired
 ls -t "${s[0]}".bak.* 2>/dev/null | tail -n +4 | while IFS= read -r f; do rm -f -- "$f"; done
 
 # crash droppings from interrupted runs
-rm -f .cmd-output.* .cmd-status.* .llm-response.* .session-compact.*
+rm -f .cmd-output.* .cmd-status.* .llm-payload.* .llm-response.* .session-compact.*
 
 # a stale lock from a dead pid is taken over automatically on the next run —
 # do NOT delete lock directories by hand.
@@ -93,5 +95,5 @@ rm -f .cmd-output.* .cmd-status.* .llm-response.* .session-compact.*
 Pair with skills/cron for a standing checkup, e.g. weekly per agent:
 
 ```cron
-10 6 * * 1 cd /abs/path/agents/researcher && ./agent.sh "Weekly checkup: run the self-maintenance skill checkup and cleanup on yourself; repair only if corrupt. Reply with one status line." >> cron.log 2>&1 # bash-agent:researcher-checkup
+10 6 * * 1 cd /abs/path/agents/researcher && ./agent.sh "Weekly checkup: run the self-maintenance skill checkup and cleanup on yourself; repair only if corrupt. Reply with one status line." >> cron.log 2>&1 # spirit-agent:researcher-checkup
 ```

@@ -7,8 +7,8 @@ description: >
   resize/crop/compress, make thumbnails and GIFs, adjust volume, take screenshots,
   and inspect media metadata. Use whenever a task involves an existing audio/video/
   image file that needs transforming or converting (mp4, mov, mp3, wav, png, jpg,
-  webp, gif, …). This is the editing/conversion counterpart to the runtime's media
-  *generation* tools (generate_image, text_to_speech, transcribe_audio). Trigger
+  webp, gif, …). This is the editing/conversion counterpart to the multimodal
+  skill (image analysis & generation, transcription, speech synthesis). Trigger
   phrases: "convert this video", "trim the clip", "extract audio", "make a gif",
   "resize the image", "compress this", "thumbnail", "screenshot the video at",
   "merge these clips", "change the format", "what codec is this".
@@ -79,19 +79,23 @@ relevant one before a non-trivial job.
 
 ## Installing the tools
 
-- **ffmpeg** (includes `ffprobe`): `apt-get install -y ffmpeg` · `brew install ffmpeg`
-- **ImageMagick** (`magick`/`convert`): `apt-get install -y imagemagick` · `brew install imagemagick`
+- **ffmpeg** (includes `ffprobe`): `apt-get install -y ffmpeg` (Debian/Ubuntu) · `apk add ffmpeg` (Alpine) · `brew install ffmpeg` (macOS)
+- **ImageMagick** (`magick`/`convert`): `apt-get install -y imagemagick` · `apk add imagemagick` · `brew install imagemagick`
+
+In the deployed container neither tool is baked in, and the agent user can't
+`apk add` (non-root) — bake them into the image (uncomment the extras
+line in `ops/Dockerfile`) when a containerized agent needs media work.
 
 `img.sh` falls back to ffmpeg for convert/resize/thumbnail when ImageMagick isn't
 installed, so simple image work still succeeds with ffmpeg alone.
 
 ## Gotchas (important in this runtime)
 
-- **`run_command` has a wall-clock timeout** (`DYNAMO_RUN_COMMAND_TIMEOUT_SECONDS`).
+- **`run_command` has a wall-clock timeout** (`COMMAND_TIMEOUT_SEC`, default 120 s).
   Long encodes can exceed it — keep jobs short (use `-ss`/`-t` to work on a segment),
-  raise the timeout for the run, or run the encode in the background and poll the
-  output file. ffmpeg writes to a file regardless, so a timed-out command may still
-  have produced partial output.
+  raise the timeout for the run, or run the encode in the background (`nohup … &`)
+  and poll the output file. ffmpeg writes to a file regardless, so a timed-out
+  command may still have produced partial output.
 - **Don't print binaries** — tools write to files; scripts emit only a short summary,
   not the media bytes. Captured output is capped, so never `cat` a media file.
 - **`-c copy` vs re-encode** — copying streams (`-c copy`) is near-instant but only

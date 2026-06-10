@@ -13,10 +13,10 @@
 set -euo pipefail
 
 # --- credential resolution -------------------------------------------------
-# Precedence: anything already in the environment wins (e.g. exported from
-# agent/.env at boot, which keeps the token out of the transcript). Only if the
+# Precedence: anything already in the environment wins (inherited from the
+# agent process, which keeps the token out of the transcript). Only if the
 # token is NOT already set do we source a config file, so it can fill the gap
-# without an agent restart.
+# without restarting the agent's environment.
 #   1. $TG_CONFIG               (explicit path, if you set it)
 #   2. telegram/config.env      (relative to the workspace root = run_command cwd)
 #   3. skills/telegram/config.env (next to this skill)
@@ -30,7 +30,7 @@ if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
   done
 fi
 
-: "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is not set. Put it in agent/.env or telegram/config.env — see skills/telegram/SKILL.md}"
+: "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is not set. Export it in the agent environment or put it in telegram/config.env — see skills/telegram/SKILL.md}"
 
 # Override TG_API_BASE to point at a local/self-hosted Bot API server (or a mock).
 TG_API_BASE="${TG_API_BASE:-https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}}"

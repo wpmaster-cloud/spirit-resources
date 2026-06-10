@@ -2,7 +2,7 @@
 name: agent-workshop
 requires: jq, git
 description: >
-  Create, command, and deploy more bash agents. Use whenever the user wants to
+  Create, command, and deploy more spirit agents. Use whenever the user wants to
   spawn a subagent or helper agent, run several agents on one machine, delegate
   or parallelize work across agents, send a task or message to another agent,
   read another agent's progress or replies, schedule agents with cron, or ship
@@ -22,7 +22,6 @@ sessions.
 ```
 agents/researcher/
 ├── agent.sh                        # the runtime (copy or symlink of this folder's agent.sh)
-├── agent.env                       # optional KEY=VALUE config pins (real environment wins)
 └── session-researcher-<id>.jsonl  # system prompt + entire conversation; single source of truth
 ```
 
@@ -40,13 +39,13 @@ Facts you rely on:
   exactly one, or `--reset`. The first session line is the system prompt;
   author a full session first (below) when the agent needs a real role from
   turn one.
-- Config precedence, highest first: real environment → `agent.env` beside the
-  script (strict KEY=VALUE lines) → BASE_URL/MODEL auto-detected from the API
-  key's prefix (OpenAI, Anthropic, OpenRouter, Groq, xAI, Gemini) → defaults.
-  Values: `AGENT_NAME`, `MODEL`, `BASE_URL`, `LLM_API_KEY`, `MAX_TURNS`,
-  `COMMAND_TIMEOUT_SEC`, `CONTEXT_COMPACT_TOKENS`, `SESSION_FILE`.
-  Pin per-agent behavior in `agent.env`; keep API keys in the environment (or
-  a secret store), never in files you ship or commit.
+- Config values come from the environment: `AGENT_NAME`, `MODEL`, `BASE_URL`,
+  `LLM_API_KEY`, `MAX_TURNS`, `COMMAND_TIMEOUT_SEC`, `COMMAND_MAX_OUTPUT_BYTES`,
+  `CONTEXT_COMPACT_TOKENS`, `SESSION_FILE`. If `BASE_URL` / `MODEL` are unset
+  they are auto-detected from the API key's prefix (OpenAI, Anthropic,
+  OpenRouter, Groq, xAI, NVIDIA, Gemini) or fall back to defaults. API keys
+  belong in the environment (or a secret store), never in files you ship or
+  commit.
 - Only one run per session at a time: while a run is active a `<session>.lock`
   directory exists next to the session file, and a second run exits with code
   **75** (busy — retry later). Appending messages is always allowed.
@@ -165,11 +164,12 @@ API at the same instant; a wake that finds the agent busy exits 75 harmlessly.
 
 ## Containers and Kubernetes
 
-`ops/` in the agent repo (github.com/tomerfooks/bash-agent) has the full thin
-deployment (alpine + bash/curl/jq/rg/git, multi-arch amd64+arm64):
-`ops/Dockerfile`, `ops/agent.yaml`, `ops/build-push.sh`. The image bakes in
-**only `agent.sh`** — no skills, no UI. An agent that needs a skill fetches it
-on demand from the public resources repo:
+`ops/` in the agent repo (github.com/tomerfooks/spirit-agent) has the full thin
+deployment (alpine + bash/curl/jq/rg/git, linux/arm64):
+`ops/Dockerfile`, `ops/agent.yaml`, `ops/build-push.sh` (image only),
+`ops/deploy.sh` (build + secret + apply). The image bakes in `agent.sh` (plus
+the main agent's `session.jsonl`) — **no skills, no UI**. An agent that needs
+a skill fetches it on demand from the public resources repo:
 
 ```bash
 git clone --depth 1 https://github.com/wpmaster-cloud/spirit-resources /work/resources
@@ -187,7 +187,8 @@ agent's own job: tell it to commit/push work products to a git remote
 for the deploy/clone/operate commands. The short version:
 
 ```bash
-ops/build-push.sh                                   # build+push multi-arch image
+ops/build-push.sh                                   # build+push the arm64 image
+LLM_API_KEY=... ops/deploy.sh                       # build+push + secret + apply in one go
 kubectl apply -f ops/agent.yaml                     # deploy agent "agent-main"
 sed 's/agent-main/agent-researcher/g' ops/agent.yaml | kubectl apply -f -   # clone
 kubectl exec deploy/agent-main -- /work/agent.sh "task"                     # give work

@@ -60,6 +60,12 @@ bash scripts/memory.sh init
 = 1536, -3-large = 3072). To use a local embedder instead of the API, set
 `MEMORY_EMBEDDER=<cmd>` (receives the text as `$1`, prints a JSON number array).
 
+Embeddings call `$BASE_URL/embeddings` — that endpoint must exist on your
+provider. It does on OpenAI; it does **not** on Anthropic (and some others), so
+an agent running on an `sk-ant-` key needs `MEMORY_EMBEDDER` or a second,
+embeddings-capable key/endpoint exported for this script. `consolidate` chats
+via `$BASE_URL/chat/completions` using `CHAT_MODEL` (defaults to `MODEL`).
+
 ## Daily use
 
 ```bash
@@ -108,8 +114,10 @@ A capable agent uses memory on both ends of a turn:
 
 - The connection (`DATABASE_URL`/`PG*`) and `LLM_API_KEY` are secrets — never echo
   them or write them into memories.
-- One shared DB can serve a whole fleet; give each agent its own table
-  (`MEMORY_TABLE` is not implemented — use a separate database/schema per agent
-  if you need isolation) or a `source` tag per agent to partition.
+- One shared DB can serve a whole fleet: partition with `--source <agent>` on
+  `remember` (or set `MEMORY_SOURCE` once per agent), or use a separate
+  database/schema per agent if you need hard isolation.
 - This is durable state: for an ephemeral container, the Postgres lives outside
-  the pod (a service), so memory survives pod replacement by design.
+  the pod (a service), so memory survives pod replacement by design. Note the
+  stock NetworkPolicy in `ops/agent.yaml` only allows egress on 53/443/80 —
+  add 5432 (or run Postgres in-pod) before a deployed agent can reach it.

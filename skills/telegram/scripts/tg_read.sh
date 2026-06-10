@@ -57,7 +57,10 @@ if [ -f "$TG_OFFSET_FILE" ]; then
 fi
 [ -n "$OFFSET" ] || OFFSET=0
 
-# curl must outlive the server-side long poll.
+# curl must outlive the server-side long poll. Consumed by tg_api in the sourced
+# _common.sh (via the command-substitution subshell below), which shellcheck
+# can't trace across the source — hence the disable.
+# shellcheck disable=SC2034
 TG_HTTP_TIMEOUT=$((TIMEOUT + 10))
 RESP="$(tg_api getUpdates -d offset="$OFFSET" -d timeout="$TIMEOUT" -d limit="$LIMIT")"
 

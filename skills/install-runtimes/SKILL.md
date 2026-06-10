@@ -30,8 +30,9 @@ ls /lib/ld-musl-* 2>/dev/null  # if this exists you're on musl (Alpine); else gl
 ```
 
 **musl vs glibc is the #1 cause of "exec format error" / "not found" on a
-binary that downloaded fine.** Alpine (this project's container) is musl. Most
-vendor tarballs are glibc; you must pick a musl build or it won't run.
+binary that downloaded fine.** Alpine (this project's container) is musl;
+Debian is glibc. Most vendor tarballs are glibc; on a musl machine you
+must pick a musl build or it won't run.
 
 ## Language runtimes — use `scripts/get.sh`
 

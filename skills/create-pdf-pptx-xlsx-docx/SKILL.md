@@ -31,7 +31,11 @@ PowerPoint, Excel, and Word are ZIP-packaged XML (OOXML). The format guides all 
 
 ## Dependencies (install on first use)
 
-The runtime is Debian-based; install what the chosen format needs:
+Install what the chosen format needs. Python/Node themselves can come from the
+**install-runtimes** skill if missing; the system tools below need a package
+manager and root (Debian shown — `apk add` the equivalents on Alpine, `brew
+install` on macOS). LibreOffice and tesseract are heavyweight: on the minimal
+spirit container, bake them into the image or do document work on a host.
 
 ```bash
 # Python libs (PDF + Excel + Office XML work)
@@ -40,7 +44,7 @@ pip install pypdf pdfplumber reportlab openpyxl "markitdown[all]" Pillow pytesse
 # Node libs (authoring from scratch)
 npm install -g pptxgenjs docx
 
-# System tools
+# System tools (Debian/Ubuntu)
 sudo apt-get update && sudo apt-get install -y \
   libreoffice pandoc qpdf poppler-utils tesseract-ocr
 ```
