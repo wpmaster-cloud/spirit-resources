@@ -176,6 +176,7 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
 .msg.dirty { border-style: dashed; border-color: var(--ink-3); }
 .msg .hd { display: flex; align-items: baseline; gap: 9px; font-size: 11.5px; }
 .msg .role { font-weight: 600; letter-spacing: .02em; }
+.msg .role .ri { display: inline-block; margin-right: 5px; font-size: 11px; opacity: .8; }
 .role.system { color: var(--warn); } .role.user { color: var(--ok); }
 .role.assistant { color: var(--link); } .role.tool { color: #9333ea; }
 .msg .when { margin-left: auto; color: var(--ink-3); font-size: 11px; }
@@ -204,12 +205,27 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
 
 .composer {
   position: sticky; bottom: 14px; margin-top: 16px;
-  background: var(--card); border: 1px solid var(--line-2); border-radius: 12px;
-  box-shadow: var(--shadow-2); padding: 10px; display: flex; gap: 8px; align-items: flex-end;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: 14px;
+  box-shadow: var(--shadow-2); padding: 12px 14px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color .15s, box-shadow .15s;
 }
-.composer select { width: 96px; flex: none; }
-.composer textarea { flex: 1; min-height: 40px; max-height: 180px; border-color: transparent; background: transparent; padding: 8px 4px; }
+.composer:focus-within {
+  border-color: var(--ink-2);
+  box-shadow: var(--shadow-2), 0 0 0 3px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.composer textarea {
+  min-height: 96px; max-height: 320px; border: 0; background: transparent;
+  padding: 4px 2px; font-size: 13.5px;
+}
 .composer textarea:focus { box-shadow: none; }
+.composer .bar { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding-top: 9px; }
+.composer .bar select {
+  width: auto; flex: none; font-size: 12px; color: var(--ink-2);
+  background: var(--bg); border-color: transparent; border-radius: 7px; padding: 5px 10px;
+}
+.composer .bar .hint { flex: 1; font-size: 11px; color: var(--ink-3); text-align: right; }
+.composer .bar label.chk { flex: none; }
 
 /* ---- side rail ---- */
 .rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; }

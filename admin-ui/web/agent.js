@@ -4,6 +4,9 @@
 // the always-safe channel, even mid-run.
 'use strict';
 
+const ROLE_ICONS = { system: '✦', user: '❯', assistant: '✳', tool: '⚙' };
+const roleIcon = (r) => h('span', { class: 'ri' }, ROLE_ICONS[r] || '·');
+
 function renderAgent(name) {
   let doc = null;          // last loaded session doc
   let rows = [];           // [{data, dirty}]
@@ -52,7 +55,7 @@ function renderAgent(name) {
     setKids(actionsEl,
       a?.running
         ? h('button', { class: 'bad', onclick: () => stopAgent(name) }, '■ Stop')
-        : h('button', { onclick: () => runTaskModal(name) }, '▶ Run task'));
+        : h('button', { onclick: () => runAgent(name) }, '▶ Run'));
     if (a?.session_state === 'conflict') renderConflict(a);
     else if (bannerEl.dataset.conflict) { bannerEl.dataset.conflict = ''; bannerEl.replaceChildren(); void load(); }
   }
@@ -132,11 +135,12 @@ function renderAgent(name) {
     function paint() {
       setKids(card,
         h('div', { class: 'hd' },
-          h('span', { class: 'role ' + role }, role),
+          h('span', { class: 'role ' + role }, roleIcon(role), role),
           m.ephemeral === true && h('span', { class: 'eph' }, 'ephemeral'),
           calls.length > 0 && h('span', { class: 'sub' }, `⚙ ${calls.length} call(s)`),
           typeof m.tool_call_id === 'string' && h('span', { class: 'sub mono' }, `↳ ${m.tool_call_id.slice(0, 12)}`),
-          h('span', { class: 'when' }, typeof m.created_at === 'string' ? m.created_at : '')),
+          h('span', { class: 'when', title: typeof m.created_at === 'string' ? m.created_at : '' },
+            typeof m.created_at === 'string' ? fmtWhen(m.created_at) : '')),
         !open && h('div', { class: 'sum' }, summary()),
         open && !editing && [
           h('div', { class: 'body' }, role === 'tool' ? prettyToolResult(content) : content),
@@ -235,7 +239,7 @@ function renderAgent(name) {
 
   function composer() {
     const roleSel = h('select', {}, ['user', 'system', 'assistant'].map((r) => h('option', {}, r)));
-    const ta = h('textarea', { placeholder: `queue a message for ${name}…  (Enter = append, always safe)` });
+    const ta = h('textarea', { placeholder: `Message ${name}… queueing is always safe, even mid-run` });
     const now = h('input', { type: 'checkbox' });
     const send = async () => {
       if (!ta.value.trim()) return;
@@ -254,9 +258,12 @@ function renderAgent(name) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
     return h('div', { class: 'composer' },
-      roleSel, ta,
-      h('label', { class: 'chk', title: 'auto-run when idle' }, now, 'now'),
-      h('button', { class: 'pri', onclick: send }, 'Append'));
+      ta,
+      h('div', { class: 'bar' },
+        roleSel,
+        h('span', { class: 'hint' }, 'Enter = append · Shift+Enter = newline'),
+        h('label', { class: 'chk', title: 'auto-run the moment the agent is idle' }, now, 'deliver now'),
+        h('button', { class: 'pri', onclick: send }, 'Append')));
   }
 
   // ---- side rail ----

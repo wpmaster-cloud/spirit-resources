@@ -85,6 +85,21 @@ function timeAgo(iso) {
   return `${(s / 86400) | 0}d ago`;
 }
 
+// human timestamp, local time: "15:45" today, "Jun 12 · 15:45" this
+// year, "Jun 12, 2025 · 15:45" otherwise. Put the raw ISO in title.
+function fmtWhen(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso || '';
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return time;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const day = d.toLocaleDateString([], sameYear
+    ? { month: 'short', day: 'numeric' }
+    : { year: 'numeric', month: 'short', day: 'numeric' });
+  return `${day} · ${time}`;
+}
+
 function timeUntil(iso) {
   const s = Math.max(0, (new Date(iso).getTime() - Date.now()) / 1000);
   if (s < 60) return `in ${Math.ceil(s)}s`;

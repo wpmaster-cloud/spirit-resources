@@ -68,7 +68,7 @@ function agentCard(a) {
     h('div', { class: 'acts', onclick: (e) => e.stopPropagation() },
       a.running
         ? h('button', { class: 'sm bad', onclick: () => stopAgent(a.name) }, '■ stop')
-        : h('button', { class: 'sm', onclick: () => runTaskModal(a.name) }, '▶ task'),
+        : h('button', { class: 'sm', onclick: () => runAgent(a.name) }, '▶ run'),
       h('button', { class: 'sm', onclick: () => queueModal(a.name, a.running) }, '✉ queue'),
       h('button', { class: 'sm', onclick: () => { go(`#/agent/${a.name}`); setTimeout(() => openLog(a.name), 50); } }, '≡ log'),
     ));
@@ -350,31 +350,16 @@ function newAgentModal(presetTemplate) {
   name.focus();
 }
 
-function runTaskModal(name) {
-  const task = h('textarea', { placeholder: 'task…' });
-  const close = openModal(
-    h('h3', {}, `Run task — ${name}`),
-    h('div', { class: 'sub' }, 'runs ./agent.sh "task" in the agent folder; output → agent.log'),
-    h('div', { class: 'field' }, task),
-    h('div', { class: 'foot' },
-      h('button', { onclick: () => close() }, 'Cancel'),
-      h('button', { class: 'pri', onclick: async () => {
-        try {
-          await api(`/api/agents/${name}/run`, { method: 'POST', body: { task: task.value } });
-          toast(`run started on ${name}`);
-          close();
-        } catch (e) {
-          if (e.status === 409 && confirm('Agent is mid-run. Queue the task instead? (delivered when idle)')) {
-            try {
-              await api(`/api/agents/${name}/messages`, { method: 'POST', body: { content: task.value, deliver_now: true } });
-              toast('queued; will run the moment it goes idle');
-              close();
-            } catch (e2) { fail(e2); }
-          } else fail(e);
-        }
-      } }, '▶ Run')),
-  );
-  task.focus();
+// run = one wake, no prompt: the agent processes queued messages and
+// continues its standing work. Content goes through the queue (✉).
+async function runAgent(name) {
+  try {
+    await api(`/api/agents/${name}/run`, { method: 'POST', body: { task: 'Process any pending messages above.' } });
+    toast(`run started on ${name}`);
+  } catch (e) {
+    if (e.status === 409) toast('agent is mid-run — queue a message instead', true);
+    else fail(e);
+  }
 }
 
 function queueModal(name, running) {
