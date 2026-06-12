@@ -173,7 +173,7 @@ a skill fetches it on demand from the public resources repo:
 
 ```bash
 git clone --depth 1 https://github.com/wpmaster-cloud/spirit-resources /work/resources
-cp -R /work/resources/skills /work/resources/ui /work/ && rm -rf /work/resources
+cp -R /work/resources/skills /work/resources/admin-ui /work/ && rm -rf /work/resources
 cat /work/skills/<name>/SKILL.md
 ```
 
