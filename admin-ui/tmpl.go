@@ -1,5 +1,5 @@
 // Templates: reusable session blueprints as files —
-// <root>/.superadmin/templates/<name>.jsonl holds records whose
+// <root>/.admin/templates/<name>.jsonl holds records whose
 // {{VAR}} placeholders are substituted at agent creation. No registry,
 // no versions: the folder IS the template list, and git (or backups)
 // is the history.
@@ -27,7 +27,7 @@ type templates struct {
 }
 
 func newTemplates(root string) *templates {
-	return &templates{dir: filepath.Join(root, ".superadmin", "templates")}
+	return &templates{dir: filepath.Join(root, ".admin", "templates")}
 }
 
 type TemplateInfo struct {

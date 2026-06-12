@@ -68,3 +68,16 @@ func TestParseSpecRejects(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsatisfiableCronNeverFires(t *testing.T) {
+	// "0 0 30 2 *" (Feb 30) parses but can never match; nextAfter must
+	// return the zero time, and the scheduler treats zero as "never" —
+	// without that it would fire on every tick.
+	next, err := parseSpec("0 0 30 2 *")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := next(at("2026-06-12T00:00:00Z")); !got.IsZero() {
+		t.Fatalf("want zero time for unsatisfiable spec, got %v", got)
+	}
+}

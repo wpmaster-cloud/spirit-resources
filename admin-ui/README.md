@@ -20,11 +20,11 @@ release create` publishes them). Flags: `--root --port --host --token`.
 - an **agent** is a folder under the root with `agent.sh`; its
   `session-*.jsonl` is its entire memory
 - `<agent>/profile.env` — non-secret launch overrides (MODEL, MAX_TURNS…)
-- `<root>/.superadmin/schedules.json` — standing tasks (`@every 30m` or
+- `<root>/.admin/schedules.json` — standing tasks (`@every 30m` or
   5-field cron, UTC; busy agents get the task queued + nudged, never dropped)
-- `<root>/.superadmin/templates/<name>.jsonl` — session blueprints with
+- `<root>/.admin/templates/<name>.jsonl` — session blueprints with
   `{{VAR}}` placeholders, rendered at agent creation
-- `<root>/.superadmin/teams.json` — named compositions: members =
+- `<root>/.admin/teams.json` — named compositions: members =
   template × count, `{{N}}`-numbered names; one click launches all
 - run history is in-memory; `agent.log` and the sessions are the durable record
 

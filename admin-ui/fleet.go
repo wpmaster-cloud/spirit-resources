@@ -194,7 +194,9 @@ func (f *fleet) create(name string, records []map[string]any, env map[string]str
 	} else {
 		b, err := os.ReadFile(f.agentSh)
 		if err != nil {
-			return cleanup(fmt.Errorf("read %s: %w", f.agentSh, err))
+			// the most common setup mistake — say exactly what to fix
+			return cleanup(&apiErr{Code: 500, Msg: "cannot read the canonical agent.sh at " + f.agentSh +
+				" — point AGENT_SH_SOURCE (or admin-ui.sh's auto-detection) at a real agent.sh"})
 		}
 		if err := os.WriteFile(target, b, 0o755); err != nil {
 			return cleanup(err)
@@ -476,10 +478,11 @@ type createReq struct {
 func (f *fleet) createFrom(req createReq, rn *runner) (*Agent, map[string]any, error) {
 	records := req.Records
 	if req.Template != "" {
-		vars := map[string]string{"AGENT_NAME": req.Name}
+		vars := map[string]string{}
 		for k, v := range req.Vars {
 			vars[k] = v
 		}
+		vars["AGENT_NAME"] = req.Name // always the real name; never overridable
 		var err error
 		if records, err = f.tmpl.render(req.Template, vars); err != nil {
 			return nil, nil, err
@@ -761,6 +764,12 @@ func (f *fleet) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(filepath.Base(cleanRel), ".jsonl") {
 		reply(w, 400, map[string]any{"error": "session files have their own guarded API — use /session and /backups"})
 		return
+	}
+	for _, part := range strings.Split(cleanRel, "/") {
+		if strings.HasSuffix(part, ".lock") {
+			reply(w, 400, map[string]any{"error": "lock directories are never touched — that is agent.sh's territory"})
+			return
+		}
 	}
 	mode := os.FileMode(0o644)
 	backup := ""

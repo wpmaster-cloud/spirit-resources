@@ -37,12 +37,30 @@ class ApiError extends Error {
   }
 }
 
+// when the server runs with --token, fetches carry it as a header and
+// URL-borne channels (SSE, downloads) carry it as ?token=
+let adminToken = localStorage.getItem('admin_token') || '';
+const withTok = (url) =>
+  adminToken ? url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(adminToken) : url;
+
 async function api(path, { method = 'GET', body } = {}) {
+  const headers = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
   const res = await fetch(path, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) {
+    const t = prompt('This admin-ui requires its token (the --token value):');
+    if (t) {
+      adminToken = t.trim();
+      localStorage.setItem('admin_token', adminToken);
+      location.reload(); // re-open SSE streams with the token
+      return new Promise(() => {}); // reload is imminent
+    }
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
@@ -102,7 +120,7 @@ let fleet = [];
 let overseerName = 'overseer';
 let onFleetChange = () => {};
 
-new EventSource('/api/events').addEventListener('fleet', (e) => {
+new EventSource(withTok('/api/events')).addEventListener('fleet', (e) => {
   fleet = JSON.parse(e.data).agents || [];
   onFleetChange();
 });

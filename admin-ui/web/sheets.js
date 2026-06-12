@@ -6,7 +6,7 @@
 function openLog(name) {
   const pre = h('pre', {}, '(connecting…)');
   openSheet([h('b', {}, 'agent.log'), h('span', {}, name), h('span', { class: 'chip ok' }, 'following')], pre);
-  const src = new EventSource(`/api/agents/${name}/log?follow=1`);
+  const src = new EventSource(withTok(`/api/agents/${name}/log?follow=1`));
   let text = '';
   src.addEventListener('log', (e) => {
     text = (text + JSON.parse(e.data)).slice(-100000);
@@ -28,11 +28,16 @@ function openFiles(name) {
 
   setKids(view, h('pre', {}, 'pick a file'));
 
+  const downloadLink = (rel) =>
+    h('a', { class: 'lnk', href: withTok(`/api/agents/${name}/file?path=${encodeURIComponent(rel)}&download=1`) }, '↓ download');
+
   async function show(rel) {
     try {
       const d = await api(`/api/agents/${name}/file?path=${encodeURIComponent(rel)}`);
       if (d.binary) {
-        setKids(view, h('pre', {}, `binary file · ${fmtSize(d.size)}`));
+        setKids(view,
+          h('div', { class: 'viewbar' }, h('span', { class: 'mono' }, rel), h('span', { style: 'margin-left:auto' }), downloadLink(rel)),
+          h('pre', {}, `binary file · ${fmtSize(d.size)}`));
         return;
       }
       const content = (d.truncated ? `… first 256 KiB of ${fmtSize(d.size)} …\n\n` : '') + (d.content || '');
@@ -41,6 +46,7 @@ function openFiles(name) {
         h('div', { class: 'viewbar' },
           h('span', { class: 'mono' }, rel),
           h('span', { style: 'margin-left:auto' }),
+          downloadLink(rel),
           editable && h('button', { class: 'sm', onclick: () => edit(rel, d.content || '') }, '✎ edit')),
         h('pre', {}, content || '(empty file)'));
     } catch (e) { fail(e); }

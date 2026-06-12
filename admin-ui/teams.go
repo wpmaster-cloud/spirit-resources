@@ -1,5 +1,5 @@
 // Teams: named multi-agent compositions, persisted as one JSON file
-// (.superadmin/teams.json). A member is "count agents from a template":
+// (.admin/teams.json). A member is "count agents from a template":
 // the name pattern's {{N}} numbers them, vars flow into the template,
 // and an optional task starts each one on creation. Launching is just
 // repeated agent creation — same path, same guarantees, one call.
@@ -45,7 +45,7 @@ type teams struct {
 }
 
 func newTeams(root string, fl *fleet, rn *runner) (*teams, error) {
-	t := &teams{path: filepath.Join(root, ".superadmin", "teams.json"), fl: fl, rn: rn}
+	t := &teams{path: filepath.Join(root, ".admin", "teams.json"), fl: fl, rn: rn}
 	b, err := os.ReadFile(t.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return t, nil

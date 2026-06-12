@@ -77,15 +77,16 @@ func (rn *runner) env(name, dir string) []string {
 		}
 		env = append(env, kv)
 	}
+	for k, v := range readProfile(dir) {
+		env = append(env, k+"="+v) // later entries win in exec env
+	}
+	// the grant comes last so a stray profile.env line can't shadow it
 	if name == rn.conf.Overseer {
 		apiURL := "http://127.0.0.1" + rn.conf.Addr[strings.LastIndex(rn.conf.Addr, ":"):]
 		env = append(env, "SUPERADMIN_API="+apiURL)
 		if rn.conf.AdminToken != "" {
 			env = append(env, "ADMIN_TOKEN="+rn.conf.AdminToken)
 		}
-	}
-	for k, v := range readProfile(dir) {
-		env = append(env, k+"="+v) // later entries win in exec env
 	}
 	return env
 }

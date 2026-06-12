@@ -1,5 +1,5 @@
 // Schedules: standing tasks on a timetable, persisted as one JSON file
-// under the agents root (.superadmin/schedules.json — no database).
+// under the agents root (.admin/schedules.json — no database).
 // At each due moment the task starts like a manual run; when the agent
 // is mid-run and queue_if_busy is set, it is appended + nudged instead,
 // so nothing is lost to the busy signal. Missed moments (server down)
@@ -52,7 +52,7 @@ type scheduler struct {
 
 func newScheduler(root string, rn *runner, log *slog.Logger) (*scheduler, error) {
 	s := &scheduler{
-		path: filepath.Join(root, ".superadmin", "schedules.json"),
+		path: filepath.Join(root, ".admin", "schedules.json"),
 		rn:   rn, log: log, next: map[int64]time.Time{},
 	}
 	b, err := os.ReadFile(s.path)
@@ -119,7 +119,9 @@ func (s *scheduler) tick() {
 			s.next[it.ID] = nextFn(now)
 			continue
 		}
-		if now.Before(nx) {
+		// zero = the spec is satisfiable never (e.g. cron "0 0 30 2 *");
+		// without this guard it would read as "due" on every tick
+		if nx.IsZero() || now.Before(nx) {
 			continue
 		}
 		s.next[it.ID] = nextFn(now)
@@ -178,7 +180,7 @@ func (s *scheduler) find(id int64) *Schedule {
 
 func (s *scheduler) decorate(it *Schedule) Schedule {
 	cp := *it
-	if nx, ok := s.next[it.ID]; ok && it.Enabled {
+	if nx, ok := s.next[it.ID]; ok && it.Enabled && !nx.IsZero() {
 		cp.NextAt = &nx
 	}
 	return cp
