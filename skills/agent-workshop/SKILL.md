@@ -53,7 +53,9 @@ Facts you rely on:
 ## Spawn a subagent
 
 ```bash
-name=researcher
+name=researcher        # lowercase a-z, 0-9 and dashes, max 40 chars — agent.sh
+                       # normalizes AGENT_NAME to this alphabet, and the admin-ui
+                       # fleet scan only sees folders that already match it
 mkdir -p "agents/$name"
 cp -- agent.sh "agents/$name/agent.sh"          # copy = isolated
 # ln -s ../../agent.sh "agents/$name/agent.sh"  # symlink = one script, many agents
@@ -72,7 +74,9 @@ replies to one short status line. Reply exactly "idle" when nothing is pending.
 EOF
   cat /tmp/base.txt
 } > /tmp/prompt.txt
-jq -nc --rawfile c /tmp/prompt.txt '{kind:"message", role:"system", content:$c}' \
+jq -nc --rawfile c /tmp/prompt.txt \
+  --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{kind:"message", created_at:$t, role:"system", content:$c}' \
   > "agents/$name/session.jsonl"
 rm -f /tmp/base.txt /tmp/prompt.txt
 
@@ -92,12 +96,21 @@ inherit that conversation.
 # Blocking: returns when the turn completes; output is printed.
 ./agents/researcher/agent.sh "Read X, summarize into outbox.md."
 
-# Background: for long tasks. Watch the log; the lock dir shows liveness.
-nohup ./agents/researcher/agent.sh "long task" > agents/researcher/run.log 2>&1 &
+# Background: for long tasks. -d detaches and logs to the agent's own
+# agent.log — the file the admin-ui log viewer reads, so prefer it over
+# hand-rolled nohup to a different file.
+./agents/researcher/agent.sh -d "long task"
+tail -f agents/researcher/agent.log
 
 # Per-call overrides: cheaper model, higher turn budget, etc.
 MODEL=gpt-5.5-mini MAX_TURNS=30 ./agents/researcher/agent.sh "task"
 ```
+
+For *persistent* non-secret overrides, write `agents/<name>/profile.env`
+(`MODEL=...`, one `KEY=value` per line; never `LLM_API_KEY` — keys stay in the
+process env). The admin-ui control plane applies it to every run it launches;
+`agent.sh` itself does **not** read it, so manual and cron runs must source it:
+`set -a; . ./profile.env; set +a; ./agent.sh "task"`.
 
 Exit code 75 means the agent is mid-run. Either wait for the lock, or queue a
 message instead (next section) — queuing never blocks and never collides.
@@ -109,7 +122,12 @@ never glob inside a redirection):
 
 ```bash
 sess=(agents/researcher/session*.jsonl)   # exactly one match on a healthy agent
+[ -e "${sess[0]}" ] || { echo "no session file — run the agent once to seed it"; exit 1; }
 ```
+
+The guard matters: with no session file the glob stays literal, and appending
+to it creates a file named `session*.jsonl` — invisible to the agent's own
+discovery, so every queued message would be silently lost.
 
 **Queue a task/message** (safe anytime, even mid-run — append only, built with
 jq, exact record shape):
@@ -126,15 +144,18 @@ Queued messages are processed on the agent's **next run** (its cron wake, or
 any one-shot you fire later). To deliver now:
 
 ```bash
-while [ -d "${sess[0]}.lock" ]; do sleep 5; done
+# check the lock OWNER, not just the dir — a crashed run leaves a stale lock
+# (dead pid) that agent.sh takes over on its next start; waiting on the bare
+# dir would hang forever
+while kill -0 "$(cat "${sess[0]}.lock/pid" 2>/dev/null)" 2>/dev/null; do sleep 5; done
 ./agents/researcher/agent.sh "Process any pending messages above."
 ```
 
 **Read its state:**
 
 ```bash
-# running or idle?
-[ -d "${sess[0]}.lock" ] && echo running || echo idle
+# running or idle? (a live pid in the lock = running; a stale lock reads idle)
+kill -0 "$(cat "${sess[0]}.lock/pid" 2>/dev/null)" 2>/dev/null && echo running || echo idle
 
 # last substantive reply
 jq -r -s '[.[] | select(.role == "assistant" and (.content // "") != "")] | last.content' \
@@ -162,9 +183,37 @@ API at the same instant; a wake that finds the agent busy exits 75 harmlessly.
 2-59/15 * * * *  cd /abs/path/agents/editor && ./agent.sh "Wake: check for queued messages and continue." >> cron.log 2>&1
 ```
 
+## When the admin-ui control plane is running
+
+If an admin-ui serves this fleet (default `http://127.0.0.1:8900`; with a
+token, add `-H "Authorization: Bearer $ADMIN_TOKEN"`), prefer its API over
+raw filesystem operations — it enforces the same invariants you would by
+hand, backs up before every rewrite, and auto-rebases concurrent appends:
+
+```bash
+# queue a message: validated record, and deliver_now auto-runs the agent
+# the moment its lock frees — replaces the append + wait-loop above
+curl -s -X POST localhost:8900/api/agents/researcher/messages \
+  -d '{"content":"New instruction: also cover Y.","deliver_now":true}'
+
+# standing tasks: replaces raw cron, and a busy agent gets the task
+# queued + nudged (queue_if_busy) instead of a wasted exit-75 wake
+curl -s -X POST localhost:8900/api/schedules \
+  -d '{"agent":"researcher","task":"Wake: continue your standing task.","spec":"@every 15m"}'
+
+# create an agent in one call (authors the session, installs agent.sh)
+curl -s -X POST localhost:8900/api/agents \
+  -d '{"name":"editor","records":[{"role":"system","content":"You are Editor: ..."}]}'
+```
+
+Everything else (`/run`, `/stop`, `/log?follow=1`, `/session`, `/backups`,
+templates, teams) is listed in the admin-ui README. The filesystem recipes in
+this skill remain correct alongside it — direct appends are exactly what the
+server's save path rebases around.
+
 ## Containers and Kubernetes
 
-`ops/` in the agent repo (github.com/tomerfooks/spirit-agent) has the full thin
+`ops/` in the agent repo (github.com/tomerfooks/spirit) has the full thin
 deployment (alpine + bash/curl/jq/rg/git, linux/arm64):
 `ops/Dockerfile`, `ops/agent.yaml`, `ops/build-push.sh` (image only),
 `ops/deploy.sh` (build + secret + apply). The image bakes in `agent.sh` (plus
