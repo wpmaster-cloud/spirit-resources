@@ -55,14 +55,21 @@ type runner struct {
 	hist    []*Run          // newest last, capped
 	nextID  int64
 	last    string // last broadcast fleet snapshot
-	clients map[chan []byte]bool
+	clients map[chan sseMsg]bool
+}
+
+// sseMsg is one named server-sent event: "fleet" snapshots, and "run"
+// completions (so the UI can announce failures the moment they happen).
+type sseMsg struct {
+	name string
+	data []byte
 }
 
 func newRunner(f *fleet, conf *config, log *slog.Logger) *runner {
 	return &runner{
 		fleet: f, conf: conf, log: log,
 		live: map[string]*Run{}, ext: map[string]*Run{}, nudges: map[string]bool{},
-		nextID: 1, clients: map[chan []byte]bool{},
+		nextID: 1, clients: map[chan sseMsg]bool{},
 	}
 }
 
@@ -155,7 +162,9 @@ func (rn *runner) start(name, task, source string) (*Run, error) {
 			r.LogEnd = &n
 		}
 		delete(rn.live, name)
+		done, _ := json.Marshal(*r)
 		rn.mu.Unlock()
+		rn.broadcast("run", done)
 		rn.log.Info("run finished", "agent", name, "exit", exit)
 	}()
 	return r, nil
@@ -273,7 +282,7 @@ func (rn *runner) tick() {
 	if snap, err := json.Marshal(map[string]any{"agents": agents}); err == nil {
 		if s := string(snap); s != rn.last {
 			rn.last = s
-			rn.broadcast(snap)
+			rn.broadcast("fleet", snap)
 		}
 	}
 }
@@ -291,12 +300,12 @@ func exitCode(err error) int {
 
 // ---- SSE --------------------------------------------------------------
 
-func (rn *runner) broadcast(data []byte) {
+func (rn *runner) broadcast(name string, data []byte) {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
 	for ch := range rn.clients {
 		select {
-		case ch <- data:
+		case ch <- sseMsg{name, data}:
 		default: // slow client: skip; the next snapshot supersedes
 		}
 	}
@@ -311,7 +320,7 @@ func (rn *runner) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-store")
 
-	ch := make(chan []byte, 8)
+	ch := make(chan sseMsg, 8)
 	rn.mu.Lock()
 	rn.clients[ch] = true
 	rn.mu.Unlock()
@@ -332,8 +341,8 @@ func (rn *runner) handleEvents(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
-		case data := <-ch:
-			fmt.Fprintf(w, "event: fleet\ndata: %s\n\n", data)
+		case msg := <-ch:
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", msg.name, msg.data)
 			fl.Flush()
 		case <-heartbeat.C:
 			fmt.Fprint(w, ": ping\n\n")

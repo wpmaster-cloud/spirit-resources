@@ -119,10 +119,22 @@ const kvText = (m) => Object.entries(m || {}).map(([k, v]) => `${k}=${v}`).join(
 let fleet = [];
 let overseerName = 'overseer';
 let onFleetChange = () => {};
+let onRunFinished = () => {}; // the agent page hooks this to refresh
 
-new EventSource(withTok('/api/events')).addEventListener('fleet', (e) => {
+const events = new EventSource(withTok('/api/events'));
+events.addEventListener('fleet', (e) => {
   fleet = JSON.parse(e.data).agents || [];
   onFleetChange();
+});
+// failed runs are announced fleet-wide the moment they finish — a small
+// red chip in a side rail is too easy to miss
+events.addEventListener('run', (e) => {
+  const r = JSON.parse(e.data);
+  if (typeof r.exit_code === 'number' && r.exit_code !== 0) {
+    const why = r.exit_code === 75 ? ' (session was busy)' : r.exit_code === 78 ? ' (session conflict)' : '';
+    toast(`${r.agent}: run failed · exit ${r.exit_code}${why} — see its log`, true);
+  }
+  onRunFinished(r);
 });
 api('/api/health').then((d) => { overseerName = d.overseer || 'overseer'; }, () => {});
 api('/api/agents').then((d) => { if (!fleet.length) { fleet = d.agents; onFleetChange(); } }, () => {});

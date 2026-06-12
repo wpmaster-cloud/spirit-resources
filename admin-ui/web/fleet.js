@@ -4,6 +4,7 @@
 
 function renderFleet() {
   onFleetChange = renderFleetBody;
+  onRunFinished = () => {}; // unhook the agent page's listener
   app().replaceChildren(
     topbar(
       h('button', { onclick: openOverseer, title: 'the fleet-managing agent' }, '✦ Overseer'),

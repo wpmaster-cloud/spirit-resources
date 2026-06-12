@@ -14,10 +14,17 @@ function renderAgent(name) {
   const actionsEl = h('span', {});
   const threadEl = h('div', { class: 'thread' });
   const bannerEl = h('div', {});
+  const runBannerEl = h('div', {});
   const railEl = h('div', { class: 'rail' });
   const saveBtn = h('button', { class: 'pri', disabled: true, onclick: () => save() }, 'Save');
+  let dismissedRun = Number(sessionStorage.getItem(`dismissed-run-${name}`)) || 0;
 
   onFleetChange = updateHeader;
+  onRunFinished = (r) => {
+    if (r.agent !== name) return;
+    renderRail(); // a finished run always changes the rail
+    if (!dirty) void load();
+  };
 
   app().replaceChildren(
     topbar(
@@ -32,7 +39,7 @@ function renderAgent(name) {
         h('h1', {}, name),
         statusEl),
       h('div', { class: 'agent' },
-        h('div', {}, bannerEl, threadEl, composer()),
+        h('div', {}, bannerEl, runBannerEl, threadEl, composer()),
         railEl)),
   );
 
@@ -267,6 +274,8 @@ function renderAgent(name) {
       backups = (d3.backups || []).slice(0, 8);
     } catch { /* rail is best-effort */ }
 
+    paintRunBanner(runs[0]);
+
     const profTa = h('textarea', { placeholder: 'MODEL=…\nMAX_TURNS=…' }, kvText(profile));
 
     setKids(railEl,
@@ -309,6 +318,32 @@ function renderAgent(name) {
           try { const r = await api(`/api/agents/${name}/archive`, { method: 'POST', body: {} }); toast(`archived to ${r.archived_to}`); go('#/'); } catch (e) { fail(e); }
         } }, '⌫ Archive agent')),
     );
+  }
+
+  // paintRunBanner shows the latest run when it FAILED: exit code plus
+  // that run's slice of agent.log, dismissible until a newer failure.
+  async function paintRunBanner(last) {
+    if (!last || typeof last.exit_code !== 'number' || last.exit_code === 0 || last.id <= dismissedRun) {
+      runBannerEl.replaceChildren();
+      return;
+    }
+    let tail = '';
+    try {
+      const seg = await api(`/api/agents/${name}/log?from=${last.log_start}&to=${last.log_end ?? -1}`);
+      tail = (seg.content || '').split('\n').filter(Boolean).slice(-8).join('\n');
+    } catch { /* banner still useful without the log */ }
+    setKids(runBannerEl, h('div', { class: 'banner' },
+      h('div', { style: 'display:flex;align-items:baseline;gap:10px' },
+        h('b', {}, `last run failed — ${exitLabel(last)}`),
+        h('span', { class: 'sub' }, `${last.task || last.source} · ${timeAgo(last.started_at)}`),
+        h('span', { style: 'margin-left:auto' }),
+        h('button', { class: 'sm', onclick: () => openLog(name) }, 'full log'),
+        h('button', { class: 'sm ghost', onclick: () => {
+          dismissedRun = last.id;
+          sessionStorage.setItem(`dismissed-run-${name}`, String(last.id));
+          runBannerEl.replaceChildren();
+        } }, 'dismiss')),
+      tail && h('pre', { class: 'runtail' }, tail)));
   }
 
   // live refresh while clean: poll the etag, reload on change
