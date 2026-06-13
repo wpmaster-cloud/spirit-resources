@@ -8,15 +8,6 @@ description: Create new skills, modify and improve existing skills, and tune a s
 
 A skill for creating new skills and iteratively improving them.
 
-> **Scope note for this workspace.** The upstream skill-creator ships an automated
-> evaluation harness (a benchmark aggregator, an HTML eval-viewer, a description
-> auto-optimizer, blind-comparison agents). **Those bundled scripts are not present
-> here**, so this version describes the *qualitative* loop only — draft, run a few
-> realistic test prompts, review the outputs with the user, and improve. Don't
-> reference or try to run `eval-viewer/generate_review.py`, `scripts/*.py`,
-> `agents/*.md`, `assets/eval_review.html`, or `references/schemas.md` — they don't
-> exist in this checkout.
-
 At a high level, creating a skill goes like this:
 
 - Decide what you want the skill to do and roughly how it should do it
