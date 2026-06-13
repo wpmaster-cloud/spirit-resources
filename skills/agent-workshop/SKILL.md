@@ -222,8 +222,18 @@ a skill fetches it on demand from the public resources repo:
 
 ```bash
 git clone --depth 1 https://github.com/wpmaster-cloud/spirit-resources /work/resources
-cp -R /work/resources/skills /work/resources/admin-ui /work/ && rm -rf /work/resources
+cp -R /work/resources/skills /work/ && rm -rf /work/resources
 cat /work/skills/<name>/SKILL.md
+```
+
+The admin-ui control plane is no longer in this repo's tree — its source
+lives in the spirit repo and only its compiled binary ships here, as a
+release. Fetch it directly when you want the UI:
+
+```bash
+curl -fsSL -o /work/admin-ui \
+  https://github.com/wpmaster-cloud/spirit-resources/releases/latest/download/admin-ui-linux-arm64 \
+  && chmod +x /work/admin-ui
 ```
 
 Containers are **ephemeral by design**: the agent self-seeds its session on
