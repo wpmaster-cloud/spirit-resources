@@ -37,6 +37,7 @@ So on the pod:
 
   ```bash
   B=http://browser-go.spirit-browser.svc.cluster.local
+  # $BROWSER_TOKEN is pre-injected into the pod env (an empty one → 401):
   curl -s -H "Authorization: Bearer $BROWSER_TOKEN" $B/render -d '{"url":"https://example.com"}'   # {url,title,text,html}
   ```
 

@@ -16,9 +16,16 @@ Playwright or Chromium locally** — the prebuilt browsers don't exist for that
 target. Instead there is a shared browser service, `browser-go`, that runs one
 real Chromium and exposes it over HTTP. Drive it with `curl` — no install:
 
+The bearer token is already in your environment as **`$BROWSER_TOKEN`** —
+deploy.sh injects it into the pod; do **not** ask anyone for it or invent one.
+Sanity-check it is present before you start: `[ -n "$BROWSER_TOKEN" ] || echo
+"BROWSER_TOKEN unset — tell the operator to redeploy with ops/deploy.sh"`. An
+empty token makes every call return `401 {"error":"missing or invalid bearer
+token"}`.
+
 ```bash
 B=http://browser-go.spirit-browser.svc.cluster.local
-H="Authorization: Bearer $BROWSER_TOKEN"     # ask the operator for the token
+H="Authorization: Bearer $BROWSER_TOKEN"     # pre-injected into the pod env
 
 # Just need the rendered content? One call (its own isolated context):
 curl -s -H "$H" $B/render -d '{"url":"https://example.com"}'   # {url,title,text,html}
