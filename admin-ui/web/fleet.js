@@ -7,8 +7,8 @@ function renderFleet() {
   onRunFinished = () => {}; // unhook the agent page's listener
   app().replaceChildren(
     topbar(
-      h('button', { onclick: openOverseer, title: 'the fleet-managing agent' }, '✦ Overseer'),
-      h('button', { class: 'pri', onclick: () => newAgentModal() }, '＋ New agent'),
+      h('button', { onclick: openOverseer, title: 'the fleet-managing agent' }, icon('spark'), 'Overseer'),
+      h('button', { class: 'pri', onclick: () => newAgentModal() }, icon('plus'), 'New agent'),
     ),
     h('div', { class: 'page', id: 'fleet-body' }),
   );
@@ -39,7 +39,9 @@ function renderFleetBody() {
     ),
     fleet.length === 0
       ? h('div', { class: 'empty' }, 'No agents yet — create one, or drop a folder with agent.sh into the agents root.')
-      : h('div', { class: 'grid' }, fleet.map(agentCard)),
+      // overseer pinned first — it manages the rest, so it leads the grid
+      : h('div', { class: 'grid' }, [...fleet].sort((a, b) =>
+          (b.name === overseerName) - (a.name === overseerName)).map(agentCard)),
     h('h2', {}, 'Schedules'), panelKeep('sched-panel'),
     h('h2', {}, 'Templates'), panelKeep('tmpl-panel'),
     h('h2', {}, 'Teams'), panelKeep('team-panel'),
@@ -54,23 +56,24 @@ function agentCard(a) {
       ? h('div', { class: 'quote soft' }, 'will self-seed a minimal prompt on first run')
       : h('div', { class: 'quote' }, a.last_reply ? `“${a.last_reply}”` : '');
 
-  return h('div', { class: 'card', onclick: () => go(`#/agent/${a.name}`) },
+  const isOverseer = a.name === overseerName;
+  return h('div', { class: 'card' + (isOverseer ? ' overseer' : ''), onclick: () => go(`#/agent/${a.name}`) },
     h('div', { class: 'hd' },
       h('span', { class: 'dot ' + st.cls }),
       h('b', {}, a.name),
-      a.name === overseerName && h('span', { title: 'overseer' }, '✦'),
+      isOverseer && h('span', { class: 'pin', title: 'overseer — the fleet-managing agent' }, '✦'),
       h('span', { class: 'who sub' }, st.label)),
     h('div', { class: 'meta' },
       h('span', {}, `${a.msgs} msgs`),
-      h('span', {}, fmtSize(a.bytes || 0)),
       h('span', {}, `active ${timeAgo(a.last_activity)}`)),
     quote,
+    // grid actions stay quick: run/stop + log. Composing a message lives
+    // in the agent page's composer (one card-click away).
     h('div', { class: 'acts', onclick: (e) => e.stopPropagation() },
       a.running
-        ? h('button', { class: 'sm bad', onclick: () => stopAgent(a.name) }, '■ stop')
-        : h('button', { class: 'sm', onclick: () => runAgent(a.name) }, '▶ run'),
-      h('button', { class: 'sm', onclick: () => queueModal(a.name, a.running) }, '✉ queue'),
-      h('button', { class: 'sm', onclick: () => { go(`#/agent/${a.name}`); setTimeout(() => openLog(a.name), 50); } }, '≡ log'),
+        ? h('button', { class: 'sm bad lead', onclick: () => stopAgent(a.name) }, icon('stop'), 'Stop')
+        : h('button', { class: 'sm lead', onclick: () => runAgent(a.name) }, icon('run'), 'Run'),
+      h('button', { class: 'sm', onclick: () => { go(`#/agent/${a.name}`); setTimeout(() => openLog(a.name), 50); } }, icon('log'), 'Log'),
     ));
 }
 
@@ -99,21 +102,21 @@ async function loadSchedules() {
   const rows = schedules.map((s) => h('tr', { style: s.enabled ? '' : 'opacity:.45' },
     h('td', {}, h('button', { class: 'sm ghost', title: s.enabled ? 'pause' : 'resume', onclick: async () => {
       try { await api(`/api/schedules/${s.id}`, { method: 'PUT', body: { enabled: !s.enabled } }); loadSchedules(); } catch (e) { fail(e); }
-    } }, s.enabled ? '⏸' : '▶')),
+    } }, icon(s.enabled ? 'pause' : 'run'))),
     h('td', { class: 'strong' }, h('a', { class: 'lnk', onclick: () => go(`#/agent/${s.agent}`) }, s.agent)),
     h('td', { title: s.task }, s.task.length > 60 ? s.task.slice(0, 60) + '…' : s.task),
     h('td', {}, h('span', { class: 'mono' }, s.spec)),
     h('td', {}, s.enabled && s.next_at ? timeUntil(s.next_at) : '—'),
     h('td', { title: s.last_result || '' }, s.last_fired ? `${timeAgo(s.last_fired)} · ${s.last_result || ''}` : 'never'),
     h('td', {},
-      h('button', { class: 'sm', onclick: async () => {
+      h('button', { class: 'sm', title: 'fire now', onclick: async () => {
         try { const r = await api(`/api/schedules/${s.id}/fire`, { method: 'POST', body: {} }); toast(`fired — ${r.result}`); loadSchedules(); } catch (e) { fail(e); }
-      } }, 'fire'),
+      } }, icon('fire'), 'fire'),
       ' ',
-      h('button', { class: 'sm bad', onclick: async () => {
+      h('button', { class: 'sm bad', title: 'delete schedule', onclick: async () => {
         if (!confirm(`Delete schedule #${s.id}?`)) return;
         try { await api(`/api/schedules/${s.id}`, { method: 'DELETE' }); loadSchedules(); } catch (e) { fail(e); }
-      } }, 'delete')),
+      } }, icon('trash'))),
   ));
 
   const agentSel = h('select', {}, fleet.map((a) => h('option', {}, a.name)));
@@ -134,7 +137,7 @@ async function loadSchedules() {
           toast('schedule created — arms on the next tick');
           loadSchedules();
         } catch (e) { fail(e); }
-      } }, 'Add')),
+      } }, icon('plus'), 'Add')),
   );
 }
 
@@ -157,16 +160,16 @@ async function loadTemplates() {
             h('td', {}, String(t.records)),
             h('td', {}, t.vars.length ? t.vars.map((v) => h('span', { class: 'chip', style: 'margin-right:4px' }, v)) : '—'),
             h('td', {},
-              h('button', { class: 'sm', onclick: () => newAgentModal(t.name) }, 'use'),
+              h('button', { class: 'sm', title: 'new agent from this template', onclick: () => newAgentModal(t.name) }, icon('plus'), 'use'),
               ' ',
-              h('button', { class: 'sm bad', onclick: async () => {
+              h('button', { class: 'sm bad', title: 'delete template', onclick: async () => {
                 if (!confirm(`Delete template ${t.name}?`)) return;
                 try { await api(`/api/templates/${t.name}`, { method: 'DELETE' }); loadTemplates(); } catch (e) { fail(e); }
-              } }, 'delete')))))),
+              } }, icon('trash'))))))),
     h('div', { class: 'rowform' },
       h('span', { class: 'sub' }, 'a template = a session.jsonl blueprint'),
       h('span', { style: 'flex:1' }),
-      h('button', { class: 'pri', onclick: newTemplateModal }, 'New template')),
+      h('button', { class: 'pri', onclick: newTemplateModal }, icon('plus'), 'New template')),
   );
 }
 
@@ -208,18 +211,18 @@ async function loadTeams() {
             h('td', { class: 'strong' }, t.name),
             h('td', {}, t.members.map((m) => `${m.count} × ${m.template} (${m.name_pattern})`).join(' · ')),
             h('td', {},
-              h('button', { class: 'sm pri', onclick: () => launchTeam(t.name) }, '⚑ launch'),
+              h('button', { class: 'sm pri', onclick: () => launchTeam(t.name) }, icon('launch'), 'launch'),
               ' ',
-              h('button', { class: 'sm', onclick: () => teamModal(t) }, 'edit'),
+              h('button', { class: 'sm', title: 'edit team', onclick: () => teamModal(t) }, icon('edit'), 'edit'),
               ' ',
-              h('button', { class: 'sm bad', onclick: async () => {
+              h('button', { class: 'sm bad', title: 'delete team', onclick: async () => {
                 if (!confirm(`Delete team ${t.name}? (launched agents stay)`)) return;
                 try { await api(`/api/teams/${t.name}`, { method: 'DELETE' }); loadTeams(); } catch (e) { fail(e); }
-              } }, 'delete')))))),
+              } }, icon('trash'))))))),
     h('div', { class: 'rowform' },
       h('span', { class: 'sub' }, 'members are created from templates; {{N}} numbers them'),
       h('span', { style: 'flex:1' }),
-      h('button', { class: 'pri', onclick: () => teamModal() }, 'New team')),
+      h('button', { class: 'pri', onclick: () => teamModal() }, icon('plus'), 'New team')),
   );
 }
 
@@ -249,7 +252,7 @@ function teamModal(team) {
     const task = h('input', { placeholder: 'autostart task (optional)', value: m.task || '' });
     const row = h('div', { class: 'mrow' },
       tplSel, pattern, count, vars, task,
-      h('button', { class: 'sm ghost', onclick: () => { members.splice(members.indexOf(entry), 1); paint(); } }, '✕'));
+      h('button', { class: 'sm ghost', title: 'remove member', onclick: () => { members.splice(members.indexOf(entry), 1); paint(); } }, icon('x')));
     const entry = {
       row,
       value: () => ({
@@ -265,7 +268,7 @@ function teamModal(team) {
 
   function paint() {
     setKids(memberList, members.map((m) => m.row),
-      h('button', { class: 'sm ghost', onclick: () => { members.push(memberRow()); paint(); } }, '＋ member'));
+      h('button', { class: 'sm ghost', onclick: () => { members.push(memberRow()); paint(); } }, icon('plus'), 'member'));
   }
   paint();
 
@@ -351,37 +354,14 @@ function newAgentModal(presetTemplate) {
 }
 
 // run = one wake, no prompt: the agent processes queued messages and
-// continues its standing work. Content goes through the queue (✉).
+// continues its standing work. Content reaches an agent through the
+// composer on its detail page (a card-click away).
 async function runAgent(name) {
   try {
-    await api(`/api/agents/${name}/run`, { method: 'POST', body: { task: 'Process any pending messages above.' } });
+    await api(`/api/agents/${name}/run`, { method: 'POST', body: {} });
     toast(`run started on ${name}`);
   } catch (e) {
-    if (e.status === 409) toast('agent is mid-run — queue a message instead', true);
+    if (e.status === 409) toast('agent is mid-run — queue a message from its page instead', true);
     else fail(e);
   }
-}
-
-function queueModal(name, running) {
-  const content = h('textarea', { placeholder: 'message…' });
-  const now = h('input', { type: 'checkbox', checked: running });
-  const close = openModal(
-    h('h3', {}, `Queue message — ${name}`),
-    h('div', { class: 'sub' }, running
-      ? 'agent is mid-run — appending is the safe channel; picked up this run or the next'
-      : 'appended to the session; processed on the next run'),
-    h('div', { class: 'field' }, content),
-    h('label', { class: 'chk' }, now, 'deliver now — auto-run when the agent is idle'),
-    h('div', { class: 'foot' },
-      h('button', { onclick: () => close() }, 'Cancel'),
-      h('button', { class: 'pri', onclick: async () => {
-        try {
-          const d = await api(`/api/agents/${name}/messages`, { method: 'POST', body: { content: content.value, deliver_now: now.checked } });
-          toast(`appended${d.nudge_armed ? ' · delivery armed' : ''}`);
-          if (d.warning) toast(d.warning, true);
-          close();
-        } catch (e) { fail(e); }
-      } }, '✉ Append')),
-  );
-  content.focus();
 }

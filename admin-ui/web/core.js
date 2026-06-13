@@ -27,6 +27,38 @@ function setKids(el, ...kids) {
   el.replaceChildren(...kids.flat(Infinity).filter((k) => k != null && k !== false));
 }
 
+// ---- icons -----------------------------------------------------------
+// Lucide-style line icons drawn in currentColor, sized to 1em so they
+// scale with the button's font. The glyph strings are STATIC LITERALS
+// (never session content), so innerHTML is safe here — the "never parse
+// session text as HTML" rule still holds everywhere else.
+const _ico = (inner) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ` +
+  `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const _fill = (inner) => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${inner}</svg>`;
+
+const ICONS = {
+  run:    _fill('<path d="M7 5.2v13.6a1 1 0 0 0 1.5.86l11.3-6.8a1 1 0 0 0 0-1.72L8.5 4.34A1 1 0 0 0 7 5.2z"/>'),
+  stop:   _fill('<rect x="6" y="6" width="12" height="12" rx="2.5"/>'),
+  log:    _ico('<polyline points="5 17 10 12 5 7"/><line x1="13" y1="18" x2="20" y2="18"/>'),
+  plus:   _ico('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
+  spark:  _fill('<path d="M12 2.5l1.9 6.1a2 2 0 0 0 1.3 1.3L21.5 12l-6.3 2.1a2 2 0 0 0-1.3 1.3L12 21.5l-1.9-6.1a2 2 0 0 0-1.3-1.3L2.5 12l6.3-2.1a2 2 0 0 0 1.3-1.3z"/>'),
+  send:   _ico('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
+  pause:  _fill('<rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/>'),
+  fire:   _fill('<path d="M13 2l-9 12h6l-1 8 9-12h-6l1-8z"/>'),
+  trash:  _ico('<polyline points="3 6 21 6"/><path d="M19 6l-.9 13a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L5 6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>'),
+  launch: _ico('<line x1="5" y1="22" x2="5" y2="3"/><path d="M5 3.5h12.5l-2.2 4.5 2.2 4.5H5"/>'),
+  edit:   _ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  check:  _ico('<polyline points="20 6 9 17 4 12"/>'),
+  x:      _ico('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
+};
+
+function icon(name) {
+  const span = h('span', { class: 'ic' });
+  span.innerHTML = ICONS[name] || '';
+  return span;
+}
+
 // ---- API -------------------------------------------------------------
 
 class ApiError extends Error {
@@ -180,7 +212,7 @@ function openSheet(barKids, bodyEl) {
   const sheet = h('div', { class: 'sheet' },
     h('div', { class: 'bar' }, ...barKids,
       h('span', { style: 'margin-left:auto' }),
-      h('button', { class: 'ghost sm', onclick: () => sheet.remove() }, '✕')),
+      h('button', { class: 'ghost sm', title: 'close', onclick: () => sheet.remove() }, icon('x'))),
     bodyEl);
   layer().append(sheet);
   return sheet;

@@ -18,21 +18,21 @@ function renderAgent(name) {
   const threadEl = h('div', { class: 'thread' });
   const bannerEl = h('div', {});
   const runBannerEl = h('div', {});
-  const railEl = h('div', { class: 'rail' });
+  const metaEl = h('div', { class: 'metabar' });
   const saveBtn = h('button', { class: 'pri', disabled: true, onclick: () => save() }, 'Save');
   let dismissedRun = Number(sessionStorage.getItem(`dismissed-run-${name}`)) || 0;
 
   onFleetChange = updateHeader;
   onRunFinished = (r) => {
     if (r.agent !== name) return;
-    renderRail(); // a finished run always changes the rail
+    renderMeta(); // a finished run always changes the meta strip
     if (!dirty) void load();
   };
 
   app().replaceChildren(
     topbar(
       h('button', { onclick: () => openFiles(name) }, '⌗ Files'),
-      h('button', { onclick: () => openLog(name) }, '≡ Log'),
+      h('button', { onclick: () => openLog(name) }, icon('log'), 'Log'),
       actionsEl,
       saveBtn,
     ),
@@ -41,9 +41,8 @@ function renderAgent(name) {
         h('span', { class: 'crumb' }, h('a', { onclick: () => go('#/') }, 'fleet'), ' / '),
         h('h1', {}, name),
         statusEl),
-      h('div', { class: 'agent' },
-        h('div', {}, bannerEl, runBannerEl, threadEl, composer()),
-        railEl)),
+      metaEl,
+      bannerEl, runBannerEl, threadEl, composer()),
   );
 
   function fleetAgent() { return fleet.find((a) => a.name === name); }
@@ -54,8 +53,8 @@ function renderAgent(name) {
     setKids(statusEl, h('span', { class: 'dot ' + st.cls }), st.label, dirty && h('span', { class: 'chip warn' }, 'unsaved'));
     setKids(actionsEl,
       a?.running
-        ? h('button', { class: 'bad', onclick: () => stopAgent(name) }, '■ Stop')
-        : h('button', { onclick: () => runAgent(name) }, '▶ Run'));
+        ? h('button', { class: 'bad', onclick: () => stopAgent(name) }, icon('stop'), 'Stop')
+        : h('button', { onclick: () => runAgent(name) }, icon('run'), 'Run'));
     if (a?.session_state === 'conflict') renderConflict(a);
     else if (bannerEl.dataset.conflict) { bannerEl.dataset.conflict = ''; bannerEl.replaceChildren(); void load(); }
   }
@@ -73,7 +72,7 @@ function renderAgent(name) {
       rows = d.messages.map((m) => ({ data: m, dirty: false }));
       setDirty(false);
       renderThread();
-      renderRail();
+      renderMeta();
     } catch (e) {
       if (e.status !== 409) fail(e); // 409 = exit-78 conflict; the banner handles it
     }
@@ -121,9 +120,12 @@ function renderAgent(name) {
     const role = typeof m.role === 'string' ? m.role : '?';
     const content = typeof m.content === 'string' ? m.content : '';
     const calls = Array.isArray(m.tool_calls) ? m.tool_calls : [];
-    let open = false, editing = false;
+    let editing = false;
 
-    const card = h('div', { class: 'msg' + (row.dirty ? ' dirty' : ''), onclick: () => { if (!editing) { open = !open; paint(); } } });
+    // Clicking the message text opens the editor straight away — no
+    // intermediate read view, no edit button. Interactive bits inside the
+    // editor stopPropagation so they don't re-trigger this.
+    const card = h('div', { class: 'msg' + (row.dirty ? ' dirty' : ''), onclick: () => { if (!editing) { editing = true; paint(); } } });
 
     function summary() {
       if (firstLine(content)) return firstLine(content);
@@ -141,25 +143,8 @@ function renderAgent(name) {
           typeof m.tool_call_id === 'string' && h('span', { class: 'sub mono' }, `↳ ${m.tool_call_id.slice(0, 12)}`),
           h('span', { class: 'when', title: typeof m.created_at === 'string' ? m.created_at : '' },
             typeof m.created_at === 'string' ? fmtWhen(m.created_at) : '')),
-        !open && h('div', { class: 'sum' }, summary()),
-        open && !editing && [
-          h('div', { class: 'body' }, role === 'tool' ? prettyToolResult(content) : content),
-          calls.map((c) => h('div', { class: 'call' }, h('div', { class: 'nm' }, c.function?.name || 'call'), prettyArgs(c.function?.arguments))),
-          h('div', { class: 'acts', onclick: (e) => e.stopPropagation() },
-            h('button', { class: 'sm', onclick: () => { editing = true; paint(); } }, '✎ edit'),
-            h('button', { class: 'sm', onclick: () => move(idx, -1) }, '↑'),
-            h('button', { class: 'sm', onclick: () => move(idx, 1) }, '↓'),
-            h('button', { class: 'sm', title: 'insert a new record below', onclick: () => {
-              rows.splice(idx + 1, 0, { data: { kind: 'message', role: 'user', content: '' }, dirty: true });
-              setDirty(true); renderThread();
-            } }, '＋ insert'),
-            h('button', { class: 'sm bad', onclick: () => {
-              if ((m.tool_calls !== undefined || m.tool_call_id !== undefined) &&
-                  !confirm('This record is part of a tool_calls pair — deleting one side breaks the session. Delete anyway?')) return;
-              rows.splice(idx, 1); setDirty(true); renderThread();
-            } }, 'delete')),
-        ],
-        open && editing && editor(),
+        !editing && h('div', { class: 'sum' }, summary()),
+        editing && editor(),
       );
     }
 
@@ -181,9 +166,21 @@ function renderAgent(name) {
           raw
             ? h('textarea', { class: 'mono', style: 'min-height:160px', spellcheck: 'false' }, rawText())
             : [h('div', { class: 'row' }, roleSel,
-                h('label', { class: 'chk', title: 'compaction may drop it' }, eph, 'ephemeral')), ta],
+                h('label', { class: 'chk', title: 'compaction may drop it' }, eph, 'ephemeral')), ta,
+               calls.map((c) => h('div', { class: 'call' }, h('div', { class: 'nm' }, c.function?.name || 'call'), prettyArgs(c.function?.arguments)))],
           h('div', { class: 'row' },
             h('button', { class: 'sm ghost', onclick: () => { raw = !raw; paintEditor(); } }, raw ? 'form' : '{} raw JSON'),
+            h('button', { class: 'sm', title: 'move up', onclick: () => move(idx, -1) }, '↑'),
+            h('button', { class: 'sm', title: 'move down', onclick: () => move(idx, 1) }, '↓'),
+            h('button', { class: 'sm', title: 'insert a new record below', onclick: () => {
+              rows.splice(idx + 1, 0, { data: { kind: 'message', role: 'user', content: '' }, dirty: true });
+              setDirty(true); renderThread();
+            } }, icon('plus'), 'insert'),
+            h('button', { class: 'sm bad', title: 'delete record', onclick: () => {
+              if ((m.tool_calls !== undefined || m.tool_call_id !== undefined) &&
+                  !confirm('This record is part of a tool_calls pair — deleting one side breaks the session. Delete anyway?')) return;
+              rows.splice(idx, 1); setDirty(true); renderThread();
+            } }, icon('trash')),
             h('span', { style: 'flex:1' }),
             h('button', { class: 'sm', onclick: () => { editing = false; paint(); } }, 'cancel'),
             h('button', { class: 'sm pri', onclick: () => {
@@ -240,7 +237,7 @@ function renderAgent(name) {
   function composer() {
     const roleSel = h('select', {}, ['user', 'system', 'assistant'].map((r) => h('option', {}, r)));
     const ta = h('textarea', { placeholder: `Message ${name}… queueing is always safe, even mid-run` });
-    const now = h('input', { type: 'checkbox' });
+    const now = h('input', { type: 'checkbox', checked: true });
     const send = async () => {
       if (!ta.value.trim()) return;
       try {
@@ -263,12 +260,15 @@ function renderAgent(name) {
         roleSel,
         h('span', { class: 'hint' }, 'Enter = append · Shift+Enter = newline'),
         h('label', { class: 'chk', title: 'auto-run the moment the agent is idle' }, now, 'deliver now'),
-        h('button', { class: 'pri', onclick: send }, 'Append')));
+        h('button', { class: 'pri', onclick: send }, icon('send'), 'Append')));
   }
 
-  // ---- side rail ----
+  // ---- meta strip ----
+  // The old two-column side rail, folded into one compact bar above the
+  // thread: session facts inline on the left, the latest runs on the right,
+  // and the rarely-touched bits (profile, backups, archive) behind disclosures.
 
-  async function renderRail() {
+  async function renderMeta() {
     let profile = {}, runs = [], backups = [];
     try {
       const [d1, d2, d3] = await Promise.all([
@@ -279,47 +279,48 @@ function renderAgent(name) {
       profile = d1.profile || {};
       runs = d2.runs || [];
       backups = (d3.backups || []).slice(0, 8);
-    } catch { /* rail is best-effort */ }
+    } catch { /* meta is best-effort */ }
 
     paintRunBanner(runs[0]);
 
     const profTa = h('textarea', { placeholder: 'MODEL=…\nMAX_TURNS=…' }, kvText(profile));
 
-    setKids(railEl,
-      h('div', { class: 'box' },
-        h('h3', {}, 'Session'),
-        h('div', { class: 'kv' }, h('span', { class: 'k' }, 'file'), h('span', { class: 'v mono' }, doc?.session_file?.split('/').pop() || '—')),
-        h('div', { class: 'kv' }, h('span', { class: 'k' }, 'records'), h('span', { class: 'v' }, String(rows.length))),
-        h('div', { class: 'kv' }, h('span', { class: 'k' }, 'size'), h('span', { class: 'v' }, doc ? fmtSize(doc.size) : '—'))),
-      h('div', { class: 'box' },
-        h('h3', {}, 'Profile (profile.env)'),
-        h('div', { class: 'stack' }, profTa,
-          h('button', { class: 'sm', onclick: async () => {
-            try { await api(`/api/agents/${name}/profile`, { method: 'PUT', body: parseKV(profTa.value) }); toast('profile saved'); } catch (e) { fail(e); }
-          } }, 'Save profile'))),
-      h('div', { class: 'box' },
-        h('h3', {}, 'Recent runs'),
-        runs.length === 0 ? h('div', { class: 'sub' }, 'none recorded') :
-          runs.map((r) => h('div', { class: 'line-item' },
-            h('span', { class: 'chip ' + exitCls(r) }, exitLabel(r)),
-            h('span', { class: 'grow', title: r.task || r.source }, r.task || `(${r.source})`),
-            h('span', { class: 'sub' }, timeAgo(r.started_at))))),
-      h('div', { class: 'box' },
-        h('h3', {}, 'Backups'),
-        backups.length === 0 ? h('div', { class: 'sub' }, 'appear after the first save or compaction') :
-          backups.map((b) => h('div', { class: 'line-item' },
-            h('span', { class: 'grow mono', title: b.name }, b.name.replace(/^.*\.bak\./, '')),
-            h('span', { class: 'sub' }, fmtSize(b.size)),
-            h('button', { class: 'sm', title: 'restore (the present is backed up first)', onclick: async () => {
-              if (!confirm('Restore this backup? The present is backed up first.')) return;
-              try {
-                const r = await api(`/api/agents/${name}/backups/${encodeURIComponent(b.name)}/restore`, { method: 'POST', body: {} });
-                toast(`restored ${r.count} records`);
-                await load();
-              } catch (e) { fail(e); }
-            } }, '⤺')))),
-      h('div', { class: 'box' },
-        h('h3', {}, 'Danger'),
+    const disc = (title, ...kids) =>
+      h('details', { class: 'disc' }, h('summary', {}, title), h('div', { class: 'disc-body' }, ...kids));
+
+    setKids(metaEl,
+      h('div', { class: 'meta-facts' },
+        h('span', { class: 'f' }, h('span', { class: 'k' }, 'session'),
+          h('span', { class: 'v mono' }, doc?.session_file?.split('/').pop() || '—')),
+        h('span', { class: 'f' }, h('span', { class: 'v' }, String(rows.length)), h('span', { class: 'k' }, 'records')),
+        h('span', { class: 'f' }, h('span', { class: 'v' }, doc ? fmtSize(doc.size) : '—')),
+        h('span', { class: 'meta-runs' },
+          runs.length === 0
+            ? h('span', { class: 'sub' }, 'no runs yet')
+            : runs.slice(0, 3).map((r) => h('span', { class: 'run', title: `${r.task || r.source} · ${timeAgo(r.started_at)}` },
+                h('span', { class: 'chip ' + exitCls(r) }, exitLabel(r)),
+                h('span', { class: 'sub' }, timeAgo(r.started_at)))))),
+      h('div', { class: 'meta-tools' },
+        disc('Profile',
+          h('div', { class: 'stack' }, profTa,
+            h('button', { class: 'sm', onclick: async () => {
+              try { await api(`/api/agents/${name}/profile`, { method: 'PUT', body: parseKV(profTa.value) }); toast('profile saved'); } catch (e) { fail(e); }
+            } }, 'Save profile'))),
+        disc(`Backups${backups.length ? ` (${backups.length})` : ''}`,
+          backups.length === 0
+            ? h('div', { class: 'sub' }, 'appear after the first save or compaction')
+            : backups.map((b) => h('div', { class: 'line-item' },
+                h('span', { class: 'grow mono', title: b.name }, b.name.replace(/^.*\.bak\./, '')),
+                h('span', { class: 'sub' }, fmtSize(b.size)),
+                h('button', { class: 'sm', title: 'restore (the present is backed up first)', onclick: async () => {
+                  if (!confirm('Restore this backup? The present is backed up first.')) return;
+                  try {
+                    const r = await api(`/api/agents/${name}/backups/${encodeURIComponent(b.name)}/restore`, { method: 'POST', body: {} });
+                    toast(`restored ${r.count} records`);
+                    await load();
+                  } catch (e) { fail(e); }
+                } }, '⤺')))),
+        h('span', { style: 'flex:1' }),
         h('button', { class: 'sm bad', onclick: async () => {
           if (!confirm(`Archive ${name}? Moves the folder to .archive/ (no hard delete).`)) return;
           try { const r = await api(`/api/agents/${name}/archive`, { method: 'POST', body: {} }); toast(`archived to ${r.archived_to}`); go('#/'); } catch (e) { fail(e); }
@@ -360,7 +361,7 @@ function renderAgent(name) {
     try {
       const d = await api(`/api/agents/${name}/session`);
       if (dirty) return;
-      if (doc && d.etag !== doc.etag) { doc = d; rows = d.messages.map((m) => ({ data: m, dirty: false })); renderThread(); renderRail(); }
+      if (doc && d.etag !== doc.etag) { doc = d; rows = d.messages.map((m) => ({ data: m, dirty: false })); renderThread(); renderMeta(); }
       else doc = d;
     } catch { /* transient */ }
   }, 2500);

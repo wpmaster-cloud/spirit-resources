@@ -17,6 +17,11 @@ last_updated: 2026-06-05
 
 Do **not** use this skill to author or edit Office documents — that's the `docx`, `pptx`, and `xlsx` skills.
 
+For reading a **live web page** (especially a JavaScript-rendered one), use the
+`web-extraction` skill instead — MarkItDown's `HTML` support is best for a
+*local* `.html` file you already have, not for fetching and cleaning pages off
+the web.
+
 ## Step 1 — Install it (do this first)
 
 The runtime does not ship MarkItDown. Install it once with the bundled idempotent script; it's safe to re-run (it no-ops if `markitdown` is already on `PATH`):
@@ -103,14 +108,22 @@ PDF · Word `.docx` · PowerPoint `.pptx` · Excel `.xlsx` / `.xls` · images (E
 For images and slide pictures, MarkItDown can caption images via an OpenAI-compatible client:
 
 ```python
+import os
 from markitdown import MarkItDown
 from openai import OpenAI
 
-client = OpenAI()  # honors OPENAI_API_KEY / OPENAI_BASE_URL
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
+# Any OpenAI-compatible vision model works — point the client at your provider.
+# Here: Anthropic via its OpenAI-compatible endpoint, using spirit's LLM_API_KEY.
+client = OpenAI(api_key=os.environ["LLM_API_KEY"],
+                base_url="https://api.anthropic.com/v1")
+md = MarkItDown(llm_client=client, llm_model="claude-sonnet-4-6",
+                llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
+
+(Plain OpenAI works too: `client = OpenAI()` honors `OPENAI_API_KEY` /
+`OPENAI_BASE_URL` — just give `llm_model` a current vision model.)
 
 For OCR text inside embedded images (PDF/DOCX/PPTX/XLSX), add the plugin:
 ```bash

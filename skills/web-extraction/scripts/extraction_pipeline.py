@@ -49,7 +49,7 @@ async def generate_schema(url: str, instruction: str, output_file: str = "genera
 
     # Use LLM to analyze the page structure and generate schema
     extraction_strategy = LLMExtractionStrategy(
-        provider="openai/gpt-4o-mini",  # Can use any LLM provider
+        provider="anthropic/claude-haiku-4-5",  # Can use any LiteLLM provider; set to your provider's current model
         instruction=f"""
         Analyze this webpage and generate a CSS/JSON extraction schema.
         Task: {instruction}
@@ -238,7 +238,7 @@ async def extract_with_llm(url: str, instruction: str):
     browser_config = BrowserConfig(headless=True)
 
     extraction_strategy = LLMExtractionStrategy(
-        provider="openai/gpt-4o-mini",  # Can change to ollama/llama3, anthropic/claude, etc.
+        provider="anthropic/claude-haiku-4-5",  # Can change to openai/..., ollama/llama3, gemini/..., etc.
         instruction=instruction,
         schema={
             "type": "object",

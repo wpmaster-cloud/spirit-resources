@@ -23,10 +23,7 @@ import (
 	"time"
 )
 
-var (
-	errNotRunning   = &apiErr{Code: 409, Msg: "no live run for this agent"}
-	errTaskRequired = &apiErr{Code: 400, Msg: "task is required"}
-)
+var errNotRunning = &apiErr{Code: 409, Msg: "no live run for this agent"}
 
 type Run struct {
 	ID         int64      `json:"id"`
@@ -127,7 +124,14 @@ func (rn *runner) start(name, task, source string) (*Run, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command("./agent.sh", task)
+	// An empty task is a wake run: --run processes whatever is already queued
+	// in the session (e.g. a deliver-now message) without appending a synthetic
+	// "process pending messages" turn of its own.
+	arg := task
+	if strings.TrimSpace(arg) == "" {
+		arg = "--run"
+	}
+	cmd := exec.Command("./agent.sh", arg)
 	cmd.Dir = a.Dir
 	cmd.Env = rn.env(name, a.Dir)
 	cmd.Stdout, cmd.Stderr = logf, logf
@@ -274,7 +278,7 @@ func (rn *runner) tick() {
 	rn.mu.Unlock()
 
 	for _, name := range fire {
-		if _, err := rn.start(name, "Process any pending messages above.", "nudge"); err != nil {
+		if _, err := rn.start(name, "", "nudge"); err != nil {
 			rn.log.Error("nudge", "agent", name, "err", err)
 		}
 	}
@@ -357,10 +361,9 @@ func (rn *runner) handleRun(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Task string `json:"task"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Task) == "" {
-		fail(w, errTaskRequired)
-		return
-	}
+	// An empty/omitted task is intentional: it fires a wake run (--run) that
+	// processes whatever is already queued without appending a message.
+	_ = json.NewDecoder(r.Body).Decode(&req)
 	run, err := rn.start(r.PathValue("name"), req.Task, "manual")
 	if err != nil {
 		fail(w, err)

@@ -19,6 +19,31 @@ This skill provides two complementary ways to turn web pages into clean, LLM-rea
 They overlap (both produce markdown from a URL), so reach for the lightest tool that does the job.
 
 Don't have a URL yet? That's the **web-search** skill — search first, then extract here.
+Converting a *local* file (PDF, .docx, .pptx, .xlsx) or pulling a YouTube
+transcript to markdown is the **markitdown** skill, not this one — this skill
+fetches and reads *live web pages*.
+
+## In the spirit cluster: Defuddle works, Crawl4AI does not — use browser-go
+
+On a **deployed spirit agent** (Alpine/musl + arm64) you cannot install a
+headless browser, so **Crawl4AI's browser-backed features do not run there** —
+it is built on Playwright/Chromium, which has no musl build. Defuddle is fine:
+it is a Node CLI that fetches and cleans HTML, no browser involved.
+
+So on the pod:
+- **Static, readable page** → Defuddle (`npm install -g defuddle`), or a plain `curl`.
+- **JS-rendered page, a screenshot, or a multi-step flow** → the shared
+  **browser-go** service over `curl` (no install). One call renders a page:
+
+  ```bash
+  B=http://browser-go.spirit-browser.svc.cluster.local
+  curl -s -H "Authorization: Bearer $BROWSER_TOKEN" $B/render -d '{"url":"https://example.com"}'   # {url,title,text,html}
+  ```
+
+  See the **playwright** skill for the full browser-go API (sessions, `/act`, `/shot`).
+
+The Crawl4AI sections below apply on a **glibc** machine — a dev box, a CI
+runner, or a non-musl container — where you can install its browser.
 
 ## Choosing your tool
 
@@ -308,7 +333,7 @@ For complex or irregular content:
 
 ```python
 extraction_strategy = LLMExtractionStrategy(
-    provider="openai/gpt-4o-mini",
+    provider="anthropic/claude-haiku-4-5",  # any LiteLLM provider works; use your provider's current model
     instruction="Extract key financial metrics and quarterly trends"
 )
 ```

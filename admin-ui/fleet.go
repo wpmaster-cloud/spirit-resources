@@ -426,7 +426,8 @@ The fleet lives at %s — each agent is a folder holding agent.sh, its session-*
    - GET|POST /api/agents/N/session        read / full-save (save carries base_etag+base_size)
    - POST /api/agents/N/messages           {"content":"...","deliver_now":true}  ← ALWAYS-SAFE, works mid-run;
                                            deliver_now auto-runs the agent the moment it goes idle
-   - POST /api/agents/N/run {"task":".."}  409 = busy → queue a message instead    POST /api/agents/N/stop
+   - POST /api/agents/N/run {"task":".."}  task optional: omit it for a wake run that just
+                                           processes queued messages    409 = busy → queue instead    POST /api/agents/N/stop
    - GET  /api/agents/N/log?lines=200      GET /api/runs?agent=N
    - GET  /api/agents/N/backups            POST /api/agents/N/backups/<backup>/restore  (present backed up first)
    - GET  /api/agents/N/files?path=        GET /api/agents/N/file?path=   workspace browsing

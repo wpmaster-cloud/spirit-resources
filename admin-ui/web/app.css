@@ -71,8 +71,13 @@ button {
   font: 500 13px/1 var(--sans); color: var(--ink);
   background: var(--card); border: 1px solid var(--line-2);
   border-radius: 8px; padding: 8px 13px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   transition: border-color .15s, background .15s, color .15s, transform .06s;
 }
+/* inline icons scale with the button's font and sit on the text baseline */
+.ic { display: inline-flex; align-items: center; justify-content: center; line-height: 0; flex: none; }
+.ic svg { display: block; width: 1.05em; height: 1.05em; }
+button.sm { gap: 5px; }
 button:hover { border-color: var(--ink-3); }
 button:active { transform: scale(.97); }
 button:disabled { opacity: .4; pointer-events: none; }
@@ -148,7 +153,14 @@ label.chk input { width: auto; }
 }
 .card .quote.alert { color: var(--bad); }
 .card .quote.soft { color: var(--warn); }
-.card .acts { display: flex; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.card .acts { display: flex; gap: 7px; border-top: 1px solid var(--line); padding-top: 11px; }
+.card .acts button { flex: 1; padding: 6px 10px; }
+/* the run/stop button leads — a hairline-darker border reads as the primary act */
+.card .acts button.lead { border-color: var(--line-2); }
+.card .acts button.lead:hover { border-color: var(--ink-3); }
+/* overseer: pinned first + a quiet accent so it reads as the lead card */
+.card.overseer { border-color: var(--line-2); box-shadow: var(--shadow-2); }
+.card.overseer .pin { margin-left: 2px; color: var(--warn); }
 
 /* ---- panel & table ---- */
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-1); overflow: hidden; }
@@ -164,8 +176,8 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
 .empty { color: var(--ink-3); text-align: center; padding: 38px 0; font-size: 13.5px; }
 
 /* ---- agent layout ---- */
-.agent { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 26px; align-items: start; }
-@media (max-width: 900px) { .agent { grid-template-columns: 1fr; } }
+/* Single column: the thread + composer own the width. What used to be the
+   side rail is now a compact .meta strip folded in above the thread. */
 
 .thread { display: flex; flex-direction: column; gap: 8px; }
 .msg {
@@ -188,7 +200,7 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
 .msg .acts { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 9px; }
 .msg .editor { margin-top: 9px; display: flex; flex-direction: column; gap: 8px; }
 .msg .editor textarea { font-family: var(--mono); font-size: 12.5px; min-height: 110px; }
-.msg .editor .row { display: flex; gap: 8px; align-items: center; }
+.msg .editor .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .msg .editor select { width: 130px; }
 
 .banner {
@@ -227,17 +239,37 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
 .composer .bar .hint { flex: 1; font-size: 11px; color: var(--ink-3); text-align: right; }
 .composer .bar label.chk { flex: none; }
 
-/* ---- side rail ---- */
-.rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; }
-.box { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-1); padding: 14px 16px; }
-.box h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
-.kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; }
-.kv .k { color: var(--ink-3); }
-.kv .v { color: var(--ink-2); text-align: right; word-break: break-all; }
+/* ---- meta strip (folded-in side rail) ---- */
+/* NB: class is .metabar, not .meta — .card .meta is the fleet card's stat row */
+.metabar {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-1); padding: 11px 16px; margin-bottom: 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.meta-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 18px; font-size: 12.5px; }
+.meta-facts .f { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.meta-facts .f .k { color: var(--ink-3); }
+.meta-facts .f .v { color: var(--ink-2); }
+.meta-facts .f .v.mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.meta-runs { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+.meta-runs .run { display: inline-flex; align-items: baseline; gap: 6px; }
+.meta-tools { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 10px; }
+.disc { font-size: 12.5px; }
+.disc > summary {
+  cursor: pointer; list-style: none; color: var(--ink-2); font-weight: 500;
+  padding: 4px 9px; border: 1px solid var(--line-2); border-radius: 7px; user-select: none;
+  transition: border-color .15s, color .15s;
+}
+.disc > summary::-webkit-details-marker { display: none; }
+.disc > summary::before { content: "▸ "; color: var(--ink-3); }
+.disc[open] > summary { color: var(--ink); border-color: var(--ink-3); }
+.disc[open] > summary::before { content: "▾ "; }
+.disc:hover > summary { border-color: var(--ink-3); }
+.disc-body { margin-top: 9px; padding: 4px 2px; max-width: 420px; }
+.disc-body .stack { display: flex; flex-direction: column; gap: 7px; }
 .line-item { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line); }
 .line-item:first-of-type { border-top: 0; }
 .line-item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
-.box .stack { display: flex; flex-direction: column; gap: 7px; }
 
 /* ---- sheets (log / files) ---- */
 .sheet {
@@ -294,4 +326,93 @@ td .mono, .mono { font-family: var(--mono); font-size: 12px; }
   margin: 10px 0 2px; padding: 9px 12px; max-height: 130px; overflow: auto;
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
   font: 11.5px/1.55 var(--mono); color: var(--ink-2); white-space: pre-wrap; word-break: break-word;
+}
+
+/* ============================================================
+   Responsive — tablet & phone.
+   The desktop layout assumes wide fixed grids (.mrow, .sheet .cols),
+   generous gutters, and sticky side rails; all of which break below
+   ~900px. These rules collapse multi-column grids to single column,
+   let toolbars wrap, and drop position:sticky so panels scroll with
+   the page on touch devices.
+   ============================================================ */
+
+/* grid/flex children only shrink below their content when min-width is 0;
+   without these, a long token stretches the column and scrolls the page. */
+@media (max-width: 900px) {
+  .thread, .metabar { min-width: 0; }
+  .msg .hd { flex-wrap: wrap; }
+  .msg .body, .msg .call, .msg .sum { overflow-wrap: anywhere; }
+  .meta-facts .f .v.mono { max-width: 200px; }
+  /* last-resort guard against any stray horizontal overflow */
+  html, body { overflow-x: hidden; }
+}
+
+/* ---- tablet ---- */
+@media (max-width: 768px) {
+  .page { padding: 22px clamp(16px, 4vw, 30px) 72px; }
+  h2 { margin-top: 26px; }
+
+  .top { gap: 10px; padding: 12px clamp(14px, 4vw, 30px); flex-wrap: wrap; }
+  .top button { padding: 7px 11px; }
+
+  .stats { gap: 18px 22px; flex-wrap: wrap; }
+  .stats b { font-size: 22px; }
+
+  /* team editor: drop the rigid 6-column grid for a flowing 2-column form */
+  .mrow { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mrow > :last-child { grid-column: span 2; justify-self: end; }
+
+  /* side-by-side log/file sheet → stacked */
+  .sheet .cols { grid-template-columns: 1fr; grid-template-rows: 38vh 1fr; }
+  .sheet .list { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+
+/* ---- phone ---- */
+@media (max-width: 560px) {
+  body { font-size: 13.5px; }
+  .page { padding: 18px 14px 64px; }
+
+  /* let the brand + actions wrap onto two lines neatly */
+  .top { padding: 10px 14px; }
+  .top .grow { display: none; }
+  .brand { margin-right: auto; }
+  .top button { font-size: 12.5px; }
+
+  h1 { font-size: 19px; }
+  .stats { gap: 14px 18px; margin-bottom: 18px; }
+  .stats b { font-size: 20px; }
+
+  /* agent cards: single column, comfortable tap targets */
+  .grid { grid-template-columns: 1fr; gap: 12px; }
+  .card .acts button, .card .acts { flex-wrap: wrap; }
+
+  /* tables overflow horizontally rather than crushing columns */
+  .panel { overflow-x: auto; }
+  th, td { padding: 9px 12px; white-space: nowrap; }
+
+  /* queue/run row form stacks its controls full-width */
+  .rowform { gap: 8px; }
+  .rowform select, .rowform input.task, .rowform input.spec { width: 100%; flex: none; min-width: 0; }
+
+  /* team editor: fully stacked, one control per line */
+  .mrow { grid-template-columns: 1fr; }
+  .mrow > :last-child { grid-column: auto; justify-self: start; }
+
+  /* drop sticky positioning so the composer scrolls with content */
+  .composer { position: static; bottom: auto; }
+  .composer .bar { flex-wrap: wrap; gap: 8px; }
+  .composer .bar .hint { display: none; }
+
+  /* taller bottom sheet — 320px is too cramped on a phone */
+  .sheet { height: 72vh; }
+  .sheet .bar { padding: 10px 14px; }
+  .sheet pre, .sheet .view pre { padding: 12px 14px; }
+  .sheet .cols { grid-template-rows: 34vh 1fr; }
+
+  /* modal hugs the viewport */
+  .veil { padding: 5vh 10px; align-items: flex-end; }
+  .modal { padding: 18px 16px; max-height: 88vh; }
+
+  .toast { max-width: 88vw; }
 }

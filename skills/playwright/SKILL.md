@@ -9,6 +9,36 @@ description: >
 
 Playwright drives **Chromium, Firefox, and WebKit** through one API. Unlike a plain HTTP fetch, it runs a real browser engine, so it sees JavaScript-rendered content and can *act* on a page — click, type, navigate, wait, and capture. This skill covers installing it cleanly on any platform and using it from Python.
 
+## In the spirit cluster: use the shared browser-go server first
+
+If you are a deployed spirit agent (Alpine/musl + arm64), **you cannot install
+Playwright or Chromium locally** — the prebuilt browsers don't exist for that
+target. Instead there is a shared browser service, `browser-go`, that runs one
+real Chromium and exposes it over HTTP. Drive it with `curl` — no install:
+
+```bash
+B=http://browser-go.spirit-browser.svc.cluster.local
+H="Authorization: Bearer $BROWSER_TOKEN"     # ask the operator for the token
+
+# Just need the rendered content? One call (its own isolated context):
+curl -s -H "$H" $B/render -d '{"url":"https://example.com"}'   # {url,title,text,html}
+curl -s -H "$H" $B/shot   -d '{"url":"https://example.com","full_page":true}' -o shot.png
+
+# Multi-step flow (login, forms)? Open a session = your own isolated browser
+# context; /act runs goto|click|fill|press|select|wait|text|content|eval:
+SP=$(curl -s -H "$H" $B/sessions); SID=$(jq -r .session_id <<<"$SP"); PID=$(jq -r .page_id <<<"$SP")
+P=$B/sessions/$SID/pages/$PID
+curl -s -H "$H" $P/act -d '{"action":"goto","url":"https://example.com/login"}'
+curl -s -H "$H" $P/act -d '{"action":"fill","selector":"#user","value":"alice"}'
+curl -s -H "$H" $P/act -d '{"action":"click","selector":"button[type=submit]"}'
+curl -s -X DELETE -H "$H" $B/sessions/$SID     # free it when done
+```
+
+Each session is isolated from other agents (own cookies/storage), so many
+agents use the one browser in parallel safely. Full API in the browser-go
+README. The rest of this skill (local install, the Python API) applies when
+you're on a glibc machine — a dev box, a CI runner, or a non-musl container.
+
 ## When to use Playwright vs web-extraction
 
 These overlap (both can load a page in a browser), so pick the lighter tool when you can:

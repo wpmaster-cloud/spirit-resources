@@ -43,7 +43,7 @@ async def test_llm_extraction():
     try:
         # Just test that the strategy can be created
         extraction_strategy = LLMExtractionStrategy(
-            provider="openai/gpt-4o-mini",
+            provider="anthropic/claude-haiku-4-5",
             instruction="Extract key financial metrics"
         )
 
