@@ -226,13 +226,13 @@ cp -R /work/resources/skills /work/ && rm -rf /work/resources
 cat /work/skills/<name>/SKILL.md
 ```
 
-The admin-ui control plane is no longer in this repo's tree — its source
-lives in the spirit repo and only its compiled binary ships here, as a
-release. Fetch it directly when you want the UI:
+The admin-ui control-plane **source** is no longer in this repo — it lives in
+the top-level spirit workspace; only its compiled binary ships here, committed
+at `admin-ui/admin-ui-linux-arm64`. Fetch it directly when you want the UI:
 
 ```bash
 curl -fsSL -o /work/admin-ui \
-  https://github.com/wpmaster-cloud/spirit-resources/releases/latest/download/admin-ui-linux-arm64 \
+  https://raw.githubusercontent.com/wpmaster-cloud/spirit-resources/master/admin-ui/admin-ui-linux-arm64 \
   && chmod +x /work/admin-ui
 ```
 
