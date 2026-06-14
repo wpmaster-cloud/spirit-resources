@@ -10,7 +10,9 @@ description: >
   to send an email from their Gmail, read or search their Gmail, email a file as
   an attachment, upload a file to Google Drive, share a Drive link, list/search
   Drive, download a Drive file/Doc, check their calendar / what's coming up, or
-  create/schedule a calendar event. Trigger
+  create/schedule a calendar event. This is the Gmail-over-OAuth path; for a
+  non-Gmail mailbox or plain app-password IMAP/SMTP, use the `email` skill
+  instead — see "Which email skill?" below. Trigger
   phrases: "gmail", "google drive", "drive", "google calendar", "my calendar",
   "schedule a meeting", "add an event", "what's on my calendar", "send from my
   gmail", "read my gmail", "search my email", "upload to drive", "share a drive
@@ -23,6 +25,20 @@ Two-way Gmail, Google Drive, and Google Calendar for the agent over Google's RES
 APIs. A single OAuth **refresh token** (minted once) is exchanged for short-lived
 access tokens on every call by `_common.sh` — so there is nothing to install and
 nothing to re-authorize day to day.
+
+> ## Which email skill? (google vs. email)
+> Two skills can send/read mail and both match "send an email" — pick **one** by
+> what's configured in the environment, don't try both:
+>
+> | Configured env var | Use this skill | Why |
+> |---|---|---|
+> | `GOOGLE_REFRESH_TOKEN` set | **`google`** (this one) | Gmail over OAuth, no app password |
+> | only `EMAIL_PASSWORD` / `EMAIL_ADDRESS` set | **`email`** | generic IMAP/SMTP, any host |
+> | both set | **`google`** | OAuth is the more capable Gmail path |
+>
+> Check first: `env | grep -E 'GOOGLE_REFRESH_TOKEN|EMAIL_PASSWORD'`. If neither
+> is set, mail isn't configured — say so instead of guessing. The `email` skill
+> is the right choice for iCloud/Outlook/Fastmail/any non-Gmail box.
 
 ```
 skills/google/

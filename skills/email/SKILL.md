@@ -7,15 +7,32 @@ description: >
   wants the agent to email someone, send a report/notification/attachment by email,
   read or search their inbox, check for new mail, reply to a message, or run an
   email-driven workflow. Works with Gmail, Outlook/Office365, iCloud, Yahoo,
-  Fastmail, Zoho, and any IMAP/SMTP host. Trigger phrases: "email me", "send an
-  email", "email this report", "check my inbox", "read my email", "any new email",
-  "reply to that email", "mail the file to".
+  Fastmail, Zoho, and any IMAP/SMTP host — this is the generic app-password path.
+  If the agent instead has Google OAuth creds (GOOGLE_REFRESH_TOKEN set), prefer
+  the `google` skill for Gmail; see "Which email skill?" below. Trigger phrases:
+  "email me", "send an email", "email this report", "check my inbox", "read my
+  email", "any new email", "reply to that email", "mail the file to".
 ---
 
 # Email (IMAP + SMTP, stdlib-only)
 
 Two-way email with zero installs: the scripts use Python's built-in `smtplib`
 (send), `imaplib` (read), and `email` (MIME) — nothing to `pip install`.
+
+> ## Which email skill? (email vs. google)
+> Two skills can send/read mail and both match "send an email" — pick **one** by
+> what's configured in the environment, don't try both:
+>
+> | Configured env var | Use this skill | Why |
+> |---|---|---|
+> | `EMAIL_ADDRESS` / `EMAIL_PASSWORD` set | **`email`** (this one) | generic IMAP/SMTP app-password, any host |
+> | `GOOGLE_REFRESH_TOKEN` set | **`google`** | Gmail over OAuth, no app password |
+> | both set | **`google`** | OAuth is the more capable Gmail path |
+>
+> Check first: `env | grep -E 'GOOGLE_REFRESH_TOKEN|EMAIL_PASSWORD'`. This `email`
+> skill is the right choice for iCloud/Outlook/Fastmail/Yahoo/Zoho or any
+> non-Gmail box. If neither var is set, mail isn't configured — say so instead of
+> guessing or filling in placeholder credentials.
 
 ```
 skills/email/
