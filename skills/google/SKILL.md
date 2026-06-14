@@ -10,8 +10,7 @@ description: >
   to send an email from their Gmail, read or search their Gmail, email a file as
   an attachment, upload a file to Google Drive, share a Drive link, list/search
   Drive, download a Drive file/Doc, check their calendar / what's coming up, or
-  create/schedule a calendar event. This is the OAuth/Gmail-API path; for plain
-  IMAP/SMTP email with an app password use the "email" skill instead. Trigger
+  create/schedule a calendar event. Trigger
   phrases: "gmail", "google drive", "drive", "google calendar", "my calendar",
   "schedule a meeting", "add an event", "what's on my calendar", "send from my
   gmail", "read my gmail", "search my email", "upload to drive", "share a drive
@@ -190,9 +189,8 @@ bounded — same pattern as the telegram/whatsapp skills.
   the memory cost.
 - **This sends as the real account** — Gmail has daily send caps (~500/day free)
   and spam policies; don't bulk-send.
-- **Don't confuse with the `email` skill** — that one is IMAP/SMTP + app password
-  (no API project, but blocked by the pod NetworkPolicy on 993/587). This skill is
-  the Gmail API over 443 and works from a deployed pod unchanged.
+- **Works from a deployed pod unchanged** — every call is HTTPS on 443, which the
+  stock NetworkPolicy in `ops/agent.yaml` already allows.
 
 For minting the refresh token, the scope table, Gmail/Drive query syntax, thread
 & attachment endpoints, folder creation, shared drives, and error codes, read

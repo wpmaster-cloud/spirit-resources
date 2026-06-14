@@ -108,5 +108,4 @@ client id/secret don't match the token. Re-mint.
   refresh token lacks the scope for this call. Re-mint with the scope added.
 - **403 `userRateLimitExceeded`** — back off; Gmail/Drive have per-user QPS caps.
 - **In a Kubernetes pod**, the stock NetworkPolicy in `ops/agent.yaml` allows
-  egress on 443, so all of these endpoints work without changes (unlike the
-  IMAP/SMTP `email` skill).
+  egress on 443, so all of these endpoints work without changes.
